@@ -245,7 +245,7 @@
       </form>
 
       <div class="signup-row">
-        New to REVV? <a href="#">Create a free account →</a>
+        New to REVV? <a href="http://localhost/rent/layouts/signup.php">Create a free account →</a>
       </div>
 
     </div>

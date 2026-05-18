@@ -655,16 +655,6 @@
   .btn-submit.loading .spinner { display: block; }
   @keyframes spin { to { transform: rotate(360deg); } }
 
-  /* Divider */
-  .or-row {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    margin-bottom: 18px;
-  }
-  .or-line { flex: 1; height: 1px; background: var(--border); }
-  .or-text { font-size: 11px; color: var(--muted); letter-spacing: 1px; text-transform: uppercase; }
-
   /* Sign up link */
   .signup-row {
     text-align: center;
