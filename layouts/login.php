@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>REVV — Sign In</title>
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow:ital,wght@0,300;0,400;0,500;0,600;1,300&family=Barlow+Condensed:wght@500;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../css/login.css">
+<link rel="stylesheet" href="/rent/css/login.css">
 </head>
 <body>
 
@@ -138,7 +138,6 @@
 
     <!-- Bottom copy -->
     <div class="visual-copy">
-      <div class="visual-tag"><div class="tag-dot"></div>Premium Car Rental</div>
       <div class="visual-headline">Drive the<br>road your<br><span class="accent">way.</span></div>
       <div class="visual-desc">Thousands of vehicles ready to go. Seamless booking, transparent pricing, and a fleet for every journey.</div>
       <div class="stats-row">
@@ -180,7 +179,11 @@
       <div class="form-title">Sign In</div>
       <div class="form-subtitle">Enter your credentials to access your account.</div>
 
-      <form id="loginForm" novalidate>
+<?php if (!empty($_GET['error']) && $_GET['error'] === 'invalid'): ?>
+      <div class="server-message error">Invalid email or password. Please try again.</div>
+<?php endif; ?>
+
+      <form id="loginForm" method="post" action="/rent/php/login_action.php" novalidate>
 
         <!-- Email -->
         <div class="field-group" id="emailGroup">
@@ -190,7 +193,7 @@
               <rect x="2" y="4" width="14" height="10" rx="2" stroke="currentColor" stroke-width="1.4"/>
               <path d="M2 6l7 5 7-5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
             </svg>
-            <input class="field-input" id="emailInput" type="email" placeholder="you@example.com" autocomplete="email">
+            <input class="field-input" id="emailInput" name="email" type="email" placeholder="you@example.com" autocomplete="email">
           </div>
           <div class="field-error" id="emailError">Please enter a valid email address.</div>
         </div>
@@ -207,7 +210,7 @@
               <path d="M6 8V6a3 3 0 1 1 6 0v2" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
               <circle cx="9" cy="12" r="1.3" fill="currentColor"/>
             </svg>
-            <input class="field-input" id="passwordInput" type="password" placeholder="••••••••" autocomplete="current-password">
+            <input class="field-input" id="passwordInput" name="password" type="password" placeholder="••••••••" autocomplete="current-password">
             <button type="button" class="eye-toggle" id="eyeToggle" aria-label="Toggle password visibility">
               <svg id="eyeIcon" width="18" height="18" viewBox="0 0 18 18" fill="none">
                 <path d="M1 9s3.5-5.5 8-5.5S17 9 17 9s-3.5 5.5-8 5.5S1 9 1 9z" stroke="currentColor" stroke-width="1.4"/>
@@ -221,7 +224,7 @@
         <!-- Options row -->
         <div class="options-row">
           <label class="checkbox-label">
-            <input class="checkbox-input" type="checkbox" id="rememberMe">
+            <input class="checkbox-input" name="remember_me" type="checkbox" id="rememberMe">
             <div class="checkbox-box">
               <svg class="checkmark" width="10" height="8" viewBox="0 0 10 8" fill="none">
                 <path d="M1 4l3 3 5-5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
@@ -244,10 +247,6 @@
 
       </form>
 
-      <div class="signup-row">
-        New to REVV? <a href="http://localhost/rent/layouts/signup.php">Create a free account →</a>
-      </div>
-
     </div>
   </div>
 
@@ -262,6 +261,6 @@
   </svg>
   <span id="toastMsg">Please fix the errors above.</span>
 </div>
-<script src="../javascript/login.js"></script>
+<script src="/rent/javascript/login.js"></script>
 </body>
 </html>

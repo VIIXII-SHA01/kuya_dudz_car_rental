@@ -1,5 +1,5 @@
 /* ════ DATA ════ */
-let vehicles = [
+let vehicles = window.serverVehicles || [
   { id:1, brand:'Toyota',     model:'Vios 1.3L',    year:2023, color:'Pearl White',    type:'Sedan',    plate:'ABC-1234', seats:5, fuel:'Gasoline', trans:'Automatic', rate:800,  mileage:12400, status:'available',   notes:'' },
   { id:2, brand:'Honda',      model:'City RS',       year:2022, color:'Lunar Silver',   type:'Sedan',    plate:'XYZ-5678', seats:5, fuel:'Gasoline', trans:'Automatic', rate:900,  mileage:23100, status:'rented',      notes:'' },
   { id:3, brand:'Mitsubishi', model:'Mirage G4',     year:2021, color:'Jet Black',      type:'Sedan',    plate:'DEF-9012', seats:5, fuel:'Gasoline', trans:'Automatic', rate:750,  mileage:31500, status:'available',   notes:'' },
@@ -17,7 +17,7 @@ let vehicles = [
   { id:15,brand:'Honda',      model:'Jazz 1.5 CVT',  year:2022, color:'Passion Red',    type:'Hatchback',plate:'NOP-1122', seats:5, fuel:'Gasoline', trans:'Automatic', rate:950,  mileage:21300, status:'available',   notes:'' },
 ];
 
-let nextId = 16;
+let nextId = window.serverVehicles ? null : 16;
 let currentFilter = 'all';
 let currentSearch = '';
 let currentView   = 'grid';
@@ -163,10 +163,24 @@ function getFiltered() {
   });
 }
 
+function updateSummaryCounts() {
+  const counts = vehicles.reduce((acc, v) => {
+    acc.total += 1;
+    acc[v.status] = (acc[v.status] || 0) + 1;
+    return acc;
+  }, { total: 0, available: 0, rented: 0, reserved: 0, maintenance: 0 });
+  document.getElementById('summaryTotal').textContent = counts.total;
+  document.getElementById('summaryAvailable').textContent = counts.available;
+  document.getElementById('summaryRented').textContent = counts.rented;
+  document.getElementById('summaryReserved').textContent = counts.reserved;
+  document.getElementById('summaryMaintenance').textContent = counts.maintenance;
+}
+
 function filterVehicles() {
   currentSearch = document.getElementById('searchInput').value;
   const data = getFiltered();
   document.getElementById('resultsCount').innerHTML = `<strong>${data.length}</strong> vehicle${data.length!==1?'s':''}`;
+  updateSummaryCounts();
   if (currentView === 'grid') renderGrid(data);
   else renderTableView(data);
 }
@@ -286,23 +300,80 @@ function saveVehicle() {
     showToast('Please fill in all required fields.'); return;
   }
 
-  if (editingId) {
-    const i = vehicles.findIndex(v => v.id===editingId);
-    if (i>-1) vehicles[i] = { ...vehicles[i], brand, model, year, color, type, plate, seats, fuel, trans, rate, mileage, status, notes };
-    showToast(`${brand} ${model} updated!`, 'success');
-  } else {
-    vehicles.unshift({ id: nextId++, brand, model, year, color, type, plate, seats, fuel, trans, rate, mileage, status, notes });
-    showToast(`${brand} ${model} added to fleet!`, 'success');
+  const payload = {
+    action: editingId ? 'update' : 'create',
+    id: editingId,
+    brand, model, year, color, type, plate, seats, fuel, trans, rate, mileage, status, notes
+  };
+
+  const hasServer = Array.isArray(window.serverVehicles);
+  if (!hasServer) {
+    if (editingId) {
+      const i = vehicles.findIndex(v => v.id===editingId);
+      if (i>-1) vehicles[i] = { ...vehicles[i], brand, model, year, color, type, plate, seats, fuel, trans, rate, mileage, status, notes };
+      showToast(`${brand} ${model} updated!`, 'success');
+    } else {
+      vehicles.unshift({ id: nextId++, brand, model, year, color, type, plate, seats, fuel, trans, rate, mileage, status, notes });
+      showToast(`${brand} ${model} added to fleet!`, 'success');
+    }
+    closeModal('addModal');
+    filterVehicles();
+    return;
   }
-  closeModal('addModal');
-  filterVehicles();
+
+  fetch('/rent/php/vehicle_action.php', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  })
+    .then(r => r.json().then(data => ({ ok: r.ok, data })))
+    .then(({ ok, data }) => {
+      if (!ok || data.error) {
+        showToast(data.error || 'Unable to save vehicle.', 'error');
+        return;
+      }
+      if (editingId) {
+        vehicles = vehicles.map(v => v.id === editingId ? data.vehicle : v);
+        showToast(`${brand} ${model} updated!`, 'success');
+      } else {
+        vehicles.unshift(data.vehicle);
+        showToast(`${brand} ${model} added to fleet!`, 'success');
+      }
+      closeModal('addModal');
+      filterVehicles();
+    })
+    .catch(() => showToast('Unable to save vehicle. Please try again.', 'error'));
 }
 
 function deleteVehicle(id) {
   const v = vehicles.find(x => x.id===id);
-  vehicles = vehicles.filter(x => x.id!==id);
-  filterVehicles();
-  showToast(`${v.brand} ${v.model} removed from fleet.`, 'error');
+  if (!v) return;
+  const hasServer = Array.isArray(window.serverVehicles);
+  if (!hasServer) {
+    vehicles = vehicles.filter(x => x.id!==id);
+    filterVehicles();
+    showToast(`${v.brand} ${v.model} removed from fleet.`, 'error');
+    return;
+  }
+
+  if (!window.confirm(`Delete ${v.brand} ${v.model} (${v.plate})?`)) return;
+
+  fetch('/rent/php/vehicle_action.php', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'delete', id })
+  })
+    .then(r => r.json().then(data => ({ ok: r.ok, data })))
+    .then(({ ok, data }) => {
+      if (!ok || data.error) {
+        showToast(data.error || 'Unable to delete vehicle.', 'error');
+        return;
+      }
+      vehicles = vehicles.filter(x => x.id!==id);
+      filterVehicles();
+      showToast(`${v.brand} ${v.model} removed from fleet.`, 'error');
+    })
+    .catch(() => showToast('Unable to delete vehicle. Please try again.', 'error'));
 }
 
 /* ════ EXPORT ════ */

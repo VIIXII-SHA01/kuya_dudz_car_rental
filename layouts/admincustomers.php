@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>REVV — Customers</title>
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow:ital,wght@0,300;0,400;0,500;0,600;1,300&family=Barlow+Condensed:wght@500;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../css/admincustomers.css">
+<link rel="stylesheet" href="/rent/css/admincustomers.css">
 </head>
 <body>
 <div class="app">
@@ -300,7 +300,7 @@
   <span id="toastMsg"></span>
 </div>
 
-<script src="../javascript/admincustomers.js"></script>
-<script src="../javascript/admindashboard.js"></script>
+<script src="/rent/javascript/admincustomers.js"></script>
+<script src="/rent/javascript/admindashboard.js"></script>
 </body>
 </html>

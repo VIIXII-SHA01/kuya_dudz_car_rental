@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>REVV — Forgot Password</title>
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow:ital,wght@0,300;0,400;0,500;0,600;1,300&family=Barlow+Condensed:wght@500;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../css/forgotpassword.css">
+<link rel="stylesheet" href="/rent/css/forgotpassword.css">
 </head>
 <body>
 
@@ -337,6 +337,6 @@
   <span id="toastMsg">Something went wrong.</span>
 </div>
 
-<script src="../javascript/forgotpassword.js"></script>
+<script src="/rent/javascript/forgotpassword.js"></script>
 </body>
 </html>

@@ -120,19 +120,8 @@
         return;
       }
 
-      // Simulate loading
       btn.classList.add('loading');
-      setTimeout(() => {
-        btn.classList.remove('loading');
-        showToast('Welcome back! Redirecting…', 'success');
-        // Reset fields
-        setTimeout(() => {
-          setFieldState('emailGroup', email, null);
-          setFieldState('passwordGroup', pass, null);
-          email.value = '';
-          pass.value = '';
-        }, 1800);
-      }, 2000);
+      loginForm.submit();
     });
   }
 

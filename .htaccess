@@ -1,0 +1,29 @@
+RewriteEngine On
+RewriteBase /rent/
+Options -Indexes
+
+# Redirect legacy direct layout URLs to clean routes
+RewriteRule ^layouts/admindashboard\.php$ /rent/dashboard [R=301,L]
+RewriteRule ^layouts/adminbooking\.php$ /rent/bookings [R=301,L]
+RewriteRule ^layouts/adminvehicles\.php$ /rent/vehicles [R=301,L]
+RewriteRule ^layouts/admincustomers\.php$ /rent/customers [R=301,L]
+RewriteRule ^layouts/admindrivers\.php$ /rent/drivers [R=301,L]
+RewriteRule ^layouts/adminpayments\.php$ /rent/payments [R=301,L]
+RewriteRule ^layouts/adminrentals\.php$ /rent/rentals [R=301,L]
+RewriteRule ^layouts/adminreports\.php$ /rent/reports [R=301,L]
+RewriteRule ^layouts/adminsettings\.php$ /rent/settings [R=301,L]
+RewriteRule ^layouts/login\.php$ /rent/login [R=301,L]
+RewriteRule ^layouts/signup\.php$ /rent/signup [R=301,L]
+
+# Block direct access to internal server-side folders that should only be included via PHP
+RewriteRule ^(layouts|navs|databases)/ - [F,L]
+
+# Serve real files and directories normally
+RewriteCond %{REQUEST_FILENAME} -f [OR]
+RewriteCond %{REQUEST_FILENAME} -d
+RewriteRule ^ - [L]
+
+# Send clean route requests to the front controller
+RewriteRule ^(login|register|dashboard|bookings|vehicles|drivers|customers|rentals|payments|reports|settings)/?$ php/mainscript.php [L,QSA]
+RewriteRule ^$ php/mainscript.php [L,QSA]
+RewriteRule ^.*$ php/mainscript.php [L,QSA]

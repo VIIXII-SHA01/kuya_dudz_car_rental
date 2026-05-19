@@ -1,3 +1,53 @@
+<?php
+require_once __DIR__ . '/../databases/connection1.php';
+$vehicles = [];
+$vehicleSummary = ['total' => 0, 'available' => 0, 'rented' => 0, 'reserved' => 0, 'maintenance' => 0];
+try {
+    $optional = ['seats', 'fuel_type', 'transmission', 'mileage'];
+    $columns = [];
+    foreach ($optional as $col) {
+        $stmt = $conn->prepare('SHOW COLUMNS FROM vehicles LIKE :column');
+        $stmt->execute([':column' => $col]);
+        $columns[$col] = (bool) $stmt->fetch(PDO::FETCH_ASSOC);
+    }
+
+    $select = 'SELECT id, vehicle_ref, make, model, year, color, plate_no, category, daily_rate, status, main_photo, remarks';
+    if ($columns['seats']) $select .= ', seats';
+    if ($columns['fuel_type']) $select .= ', fuel_type';
+    if ($columns['transmission']) $select .= ', transmission';
+    if ($columns['mileage']) $select .= ', mileage';
+    $select .= ' FROM vehicles ORDER BY id DESC';
+
+    $stmt = $conn->prepare($select);
+    $stmt->execute();
+    $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    foreach ($rows as $row) {
+        $status = $row['status'] ?? 'available';
+        $vehicles[] = [
+            'id' => (int) $row['id'],
+            'brand' => $row['make'] ?? '',
+            'model' => $row['model'] ?? '',
+            'year' => (int) $row['year'],
+            'color' => $row['color'] ?? '',
+            'type' => $row['category'] ?? '',
+            'plate' => $row['plate_no'] ?? '',
+            'seats' => isset($row['seats']) ? (int) $row['seats'] : 0,
+            'fuel' => $row['fuel_type'] ?? '',
+            'trans' => $row['transmission'] ?? '',
+            'rate' => (float) $row['daily_rate'],
+            'mileage' => isset($row['mileage']) ? (int) $row['mileage'] : 0,
+            'status' => $status,
+            'notes' => trim($row['remarks'] ?? ''),
+        ];
+        $vehicleSummary['total']++;
+        if (isset($vehicleSummary[$status])) {
+            $vehicleSummary[$status]++;
+        }
+    }
+} catch (PDOException $e) {
+    $vehicles = [];
+}
+?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -5,7 +55,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>REVV — Vehicles</title>
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow:ital,wght@0,300;0,400;0,500;0,600;1,300&family=Barlow+Condensed:wght@500;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../css/adminvehicles.css">
+<link rel="stylesheet" href="/rent/css/adminvehicles.css">
 </head>
 <body>
 <div class="app">
@@ -77,11 +127,11 @@
 
       <!-- Summary strip -->
       <div class="summary-strip">
-        <div class="sstrip-item"><div class="sstrip-val">20</div><div class="sstrip-lab">Total Fleet</div></div>
-        <div class="sstrip-item"><div class="sstrip-val" style="color:var(--green)">9</div><div class="sstrip-lab">Available</div></div>
-        <div class="sstrip-item"><div class="sstrip-val" style="color:var(--gold)">7</div><div class="sstrip-lab">On Rent</div></div>
-        <div class="sstrip-item"><div class="sstrip-val" style="color:var(--blue)">2</div><div class="sstrip-lab">Reserved</div></div>
-        <div class="sstrip-item"><div class="sstrip-val" style="color:var(--red)">2</div><div class="sstrip-lab">Maintenance</div></div>
+        <div class="sstrip-item"><div class="sstrip-val" id="summaryTotal"><?php echo $vehicleSummary['total']; ?></div><div class="sstrip-lab">Total Fleet</div></div>
+        <div class="sstrip-item"><div class="sstrip-val" id="summaryAvailable" style="color:var(--green)"><?php echo $vehicleSummary['available']; ?></div><div class="sstrip-lab">Available</div></div>
+        <div class="sstrip-item"><div class="sstrip-val" id="summaryRented" style="color:var(--gold)"><?php echo $vehicleSummary['rented']; ?></div><div class="sstrip-lab">On Rent</div></div>
+        <div class="sstrip-item"><div class="sstrip-val" id="summaryReserved" style="color:var(--blue)"><?php echo $vehicleSummary['reserved']; ?></div><div class="sstrip-lab">Reserved</div></div>
+        <div class="sstrip-item"><div class="sstrip-val" id="summaryMaintenance" style="color:var(--red)"><?php echo $vehicleSummary['maintenance']; ?></div><div class="sstrip-lab">Maintenance</div></div>
       </div>
 
       <!-- Filter bar -->
@@ -112,7 +162,7 @@
           <option>Nissan</option>
         </select>
         <div class="filter-spacer"></div>
-        <div class="results-count" id="resultsCount"><strong>20</strong> vehicles</div>
+        <div class="results-count" id="resultsCount"><strong><?php echo $vehicleSummary['total']; ?></strong> vehicles</div>
       </div>
 
       <!-- GRID VIEW -->
@@ -145,7 +195,7 @@
           <div class="empty-sub">No vehicles match your current filters.</div>
         </div>
         <div class="table-footer">
-          <div class="tf-info" id="tfInfo">Showing <strong>1–10</strong> of <strong>20</strong></div>
+          <div class="tf-info" id="tfInfo"><?php echo $vehicleSummary['total'] > 0 ? 'Showing <strong>1–'.min(10, $vehicleSummary['total']).'</strong> of <strong>'.$vehicleSummary['total'].'</strong>' : 'No results'; ?></div>
           <div class="pagination">
             <button class="pg-btn" disabled><svg width="12" height="12" viewBox="0 0 12 12" fill="none" color="currentColor"><path d="M8 2L4 6l4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></button>
             <button class="pg-btn active">1</button>
@@ -165,6 +215,10 @@
     </div>
   </div>
 </div>
+
+<script>
+window.serverVehicles = <?php echo json_encode($vehicles, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+</script>
 
 <!-- ══ ADD/EDIT MODAL ══ -->
 <div class="modal-overlay" id="addModal" onclick="closeModalOutside(event,'addModal')">
@@ -309,7 +363,10 @@
   <span id="toastMsg"></span>
 </div>
 
-<script src="../javascript/adminvehicles.js"></script>
-<script src="../javascript/admindashboard.js"></script>
+<script>
+window.serverVehicles = <?php echo json_encode($vehicles, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+</script>
+<script src="/rent/javascript/adminvehicles.js"></script>
+<script src="/rent/javascript/admindashboard.js"></script>
 </body>
 </html>
