@@ -6,6 +6,7 @@
 <title>REVV — Booking List</title>
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow:ital,wght@0,300;0,400;0,500;0,600;1,300&family=Barlow+Condensed:wght@500;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="../css/adminbooking.css">
+<link rel="stylesheet" href="../css/admindashboard.css">
 </head>
 <body>
 <div class="app">
@@ -13,11 +14,19 @@
   <!-- ══ SIDEBAR ══ -->
   <?php include("../navs/adminnavs.php"); ?>
 
+  <!-- Sidebar Overlay -->
+  <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
   <!-- ══ MAIN ══ -->
   <div class="main">
 
     <!-- TOPBAR -->
     <header class="topbar">
+      <button class="menu-toggle" id="menuToggle" aria-label="Toggle Menu">
+        <svg width="18" height="18" viewBox="0 0 18 18" fill="none" color="white">
+          <path d="M3 5h12M3 9h12M3 13h12" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+        </svg>
+      </button>
       <div class="topbar-title">Bookings</div>
       <div class="topbar-divider"></div>
       <div class="search-wrap">
@@ -262,5 +271,6 @@
 </div>
 
 <script src="../javascript/adminbooking.js"></script>
+<script src="../javascript/admindashboard.js"></script>
 </body>
 </html>

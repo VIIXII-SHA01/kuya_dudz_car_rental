@@ -13,9 +13,19 @@
   <!-- ══ SIDEBAR ══ -->
   <?php include("../navs/adminnavs.php"); ?>
 
+  <!-- Sidebar Overlay -->
+  <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
   <!-- ══ MAIN ══ -->
   <div class="main">
     <header class="topbar">
+      <!-- Hamburger — shown only when sidebar is collapsed (via CSS) -->
+      <button class="menu-toggle" id="menuToggle" aria-label="Toggle navigation">
+        <svg width="18" height="18" viewBox="0 0 18 18" fill="none" color="white">
+          <path d="M3 5h12M3 9h12M3 13h12" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+        </svg>
+      </button>
+
       <div class="topbar-title">Customers</div>
       <div class="topbar-divider"></div>
       <div class="search-wrap">
@@ -291,5 +301,6 @@
 </div>
 
 <script src="../javascript/admincustomers.js"></script>
+<script src="../javascript/admindashboard.js"></script>
 </body>
 </html>
