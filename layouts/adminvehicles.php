@@ -38,6 +38,7 @@ try {
             'mileage' => isset($row['mileage']) ? (int) $row['mileage'] : 0,
             'status' => $status,
             'notes' => trim($row['remarks'] ?? ''),
+            'photo' => !empty($row['main_photo']) ? '/rent/uploads/' . basename($row['main_photo']) : '',
         ];
         $vehicleSummary['total']++;
         if (isset($vehicleSummary[$status])) {
@@ -310,11 +311,21 @@ window.serverVehicles = <?php echo json_encode($vehicles, JSON_HEX_TAG | JSON_HE
         </div>
       </div>
       <div class="section-divider">Photo</div>
+      <input type="file" id="f-photo" accept="image/png,image/jpeg" style="display:none" onchange="handlePhotoChange(event)">
       <div class="form-row full">
-        <div class="upload-zone" onclick="showToast('Photo upload — coming soon!','success')">
+        <div class="upload-zone" onclick="document.getElementById('f-photo').click()">
           <svg width="28" height="28" viewBox="0 0 28 28" fill="none" color="#E8341A"><rect x="2" y="6" width="24" height="17" rx="3" stroke="currentColor" stroke-width="1.6"/><circle cx="9" cy="13" r="2.5" stroke="currentColor" stroke-width="1.5"/><path d="M2 19l7-6 5 5 4-4 8 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M18 3l3 3-3 3M21 6H14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
           <div class="upload-label"><strong>Click to upload</strong> or drag & drop</div>
           <div class="upload-sub">PNG, JPG up to 5MB</div>
+        </div>
+      </div>
+      <div class="form-row full" style="margin-top:8px">
+        <div class="upload-helper" id="photoFilename" style="font-size:12px;color:var(--muted);padding-left:4px"></div>
+      </div>
+      <div class="form-row full" style="margin-top:8px">
+        <div class="photo-preview-wrap" id="photoPreviewWrap" style="display:none">
+          <label class="form-label">Photo Preview</label>
+          <img id="photoPreview" alt="Photo preview" style="width:100%;height:auto;border-radius:4px;border:1px solid var(--border);background:var(--card);" />
         </div>
       </div>
       <div class="form-row full" style="margin-top:4px">

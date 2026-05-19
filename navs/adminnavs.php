@@ -80,13 +80,6 @@
         </svg>
         Customers
       </a>
-      <a class="nav-item <?php echo isActive('rentals', $currentRoute); ?>" href="/rent/rentals">
-        <svg class="nav-icon" width="17" height="17" viewBox="0 0 17 17" fill="none" color="white">
-          <circle cx="8.5" cy="8.5" r="6.5" stroke="currentColor" stroke-width="1.4"/>
-          <path d="M8.5 5.5v3.5l2.5 2" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
-        </svg>
-        Rentals
-      </a>
       <a class="nav-item <?php echo isActive('payments', $currentRoute); ?>" href="/rent/payments">
         <svg class="nav-icon" width="17" height="17" viewBox="0 0 17 17" fill="none" color="white">
           <rect x="3" y="2" width="11" height="13" rx="2" stroke="currentColor" stroke-width="1.4"/>

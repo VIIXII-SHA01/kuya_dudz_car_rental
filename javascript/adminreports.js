@@ -1,42 +1,26 @@
 /* ════ DATA ════ */
-const monthData = [
-  { month:'Jan', revenue:42500, rentals:4, color:'#3D8FBE' },
-  { month:'Feb', revenue:58200, rentals:5, color:'#3D8FBE' },
-  { month:'Mar', revenue:97400, rentals:6, color:'#E8341A' },
-  { month:'Apr', revenue:75500, rentals:3, color:'#D4A843' }, // partial
-];
-const maxRev = Math.max(...monthData.map(m=>m.revenue));
-
-const fleetMix = [
-  { type:'SUV',       count:6, color:'#D4A843' },
-  { type:'Sedan',     count:5, color:'#3D8FBE' },
-  { type:'Van',       count:2, color:'#9A3DBE' },
-  { type:'Pickup',    count:1, color:'#3DBE7A' },
-  { type:'Hatchback', count:2, color:'#6A6E75' },
-];
-const totalMix = fleetMix.reduce((s,d)=>s+d.count,0);
-
-const topVehicles = [
-  { name:'Mercedes GLE', plate:'MMM 3344 / FFF 6789', revenue:133000, max:133000 },
-  { name:'Toyota Fortuner', plate:'DDD 4567 / LLL 2233', revenue:50000, max:133000 },
-  { name:'Toyota HiAce', plate:'JJJ 0123 / NNN 4455', revenue:38500, max:133000 },
-  { name:'Ford Everest', plate:'BBB 2345', revenue:22500, max:133000 },
-  { name:'Ford Ranger', plate:'PPP 6677', revenue:16800, max:133000 },
-];
-
-const statusData = [
-  { label:'Ongoing',   val:4,  color:'var(--blue)',  bar:'#3D8FBE' },
-  { label:'Reserved',  val:3,  color:'var(--gold)',  bar:'#D4A843' },
-  { label:'Completed', val:7,  color:'var(--green)', bar:'#3DBE7A' },
-  { label:'Overdue',   val:2,  color:'var(--red)',   bar:'#E8341A' },
-];
-
-const insights = [
-  { icon:'📈', iconBg:'var(--green-dim)', iconBdr:'rgba(61,190,122,0.2)', title:'Revenue Peaking in March', desc:'March 2026 saw ₱97,400 in revenue — the highest month this quarter, driven by high-value SUV and van bookings.' },
-  { icon:'⚠️', iconBg:'var(--red-dim)',   iconBdr:'rgba(232,52,26,0.2)',  title:'2 Overdue Rentals Require Action', desc:'RNT-012 (Maria Santos) and RNT-016 (Jomar Ocampo) are overdue with ₱36,800 in pending balances.' },
-  { icon:'🚗', iconBg:'var(--blue-dim)',  iconBdr:'rgba(61,143,190,0.2)', title:'SUVs Are Your Top Earner', desc:'SUV rentals account for 6 of 16 total rentals and the majority of revenue. Consider expanding the SUV fleet.' },
-  { icon:'🔁', iconBg:'var(--gold-dim)',  iconBdr:'rgba(212,168,67,0.2)', title:'Strong Repeat Customer Rate', desc:'44% of rentals this quarter came from returning customers — Maria Santos and Jose Reyes each booked twice.' },
-];
+const REPORT_API = '/rent/php/report_action.php';
+let monthData = [];
+let fleetMix = [];
+let topVehicles = [];
+let statusData = [];
+let insights = [];
+let totalMix = 0;
+let reportStats = {
+  days: '—',
+  utilization: '—',
+  repeat: '—',
+};
+let currentKpis = {
+  revenue: 0,
+  rentals: 0,
+  avg: 0,
+  overdue: 0,
+  revenueDelta: '',
+  rentalsDelta: '',
+  avgDelta: '',
+  overdueDelta: '',
+};
 
 const periodRanges = {
   week:    'Apr 6 – Apr 12, 2026',
@@ -45,9 +29,72 @@ const periodRanges = {
   year:    'Jan 1 – Apr 12, 2026',
 };
 
+async function loadReport() {
+  try {
+    const response = await fetch(REPORT_API);
+    const result = await response.json();
+    if (!response.ok || result.error) {
+      throw new Error(result.error || 'Unable to load report data.');
+    }
+
+    currentKpis = {
+      revenue: result.kpis.revenue || 0,
+      rentals: result.kpis.rentals || 0,
+      avg: result.kpis.avg || 0,
+      overdue: result.kpis.overdue || 0,
+    };
+    monthData = Array.isArray(result.revenueByMonth) ? result.revenueByMonth : [];
+    fleetMix = Array.isArray(result.fleetMix) ? result.fleetMix : [];
+    totalMix = result.totalMix || fleetMix.reduce((sum, item) => sum + (item.count || 0), 0);
+    topVehicles = Array.isArray(result.topVehicles) ? result.topVehicles : [];
+    statusData = Array.isArray(result.statusData) ? result.statusData : [];
+    insights = Array.isArray(result.insights) ? result.insights : [];
+
+    updateKpis();
+    renderMetricCards();
+    renderRevenueChart();
+    renderDonut();
+    renderTopVehicles();
+    renderStatusGrid();
+    renderInsights();
+  } catch (err) {
+    console.warn('Report API load failed:', err);
+    showToast('Unable to load report data from the server.','error');
+    renderMetricCards();
+    renderRevenueChart();
+    renderDonut();
+    renderTopVehicles();
+    renderStatusGrid();
+    renderInsights();
+  }
+}
+
+function updateKpis() {
+  document.getElementById('kpi-revenue').textContent = '₱' + Number(currentKpis.revenue).toLocaleString();
+  document.getElementById('kpi-rentals').textContent = Number(currentKpis.rentals).toLocaleString();
+  document.getElementById('kpi-avg').textContent = '₱' + Number(currentKpis.avg).toLocaleString();
+  document.getElementById('kpi-overdue').textContent = '₱' + Number(currentKpis.overdue).toLocaleString();
+  document.getElementById('kpi-revenue-delta').textContent = currentKpis.revenueDelta;
+  document.getElementById('kpi-rentals-delta').textContent = currentKpis.rentalsDelta;
+  document.getElementById('kpi-avg-delta').textContent = currentKpis.avgDelta;
+  document.getElementById('kpi-overdue-delta').textContent = currentKpis.overdueDelta;
+}
+
+function renderMetricCards() {
+  document.getElementById('metric-days').textContent = reportStats.days;
+  document.getElementById('metric-utilization').textContent = reportStats.utilization;
+  document.getElementById('metric-repeat').textContent = reportStats.repeat;
+}
+
 /* ════ RENDER: REVENUE BAR CHART ════ */
 function renderRevenueChart() {
   const el = document.getElementById('revenueChart');
+  if (!monthData.length) {
+    el.innerHTML = '<div class="empty-state">No revenue data available for the selected period.</div>';
+    return;
+  }
+
+  const maxRev = Math.max(...monthData.map(m => m.revenue), 1);
   el.innerHTML = monthData.map(m => {
     const pct = (m.revenue / maxRev * 100).toFixed(1);
     const isMax = m.revenue === maxRev;
@@ -60,82 +107,89 @@ function renderRevenueChart() {
             <span class="bar-amount">${m.rentals} rentals</span>
           </div>
         </div>
-        <div class="bar-val">₱${(m.revenue/1000).toFixed(0)}k</div>
+        <div class="bar-val">₱${(m.revenue / 1000).toFixed(0)}k</div>
       </div>`;
   }).join('');
 }
 
 /* ════ RENDER: DONUT ════ */
 function renderDonut() {
-  const cx = 80, cy = 80, r = 60, strokeW = 18;
+  const cx = 80;
+  const cy = 80;
+  const r = 60;
+  const strokeW = 18;
   const circumference = 2 * Math.PI * r;
-  let offset = 0;
-  let paths = '';
-  fleetMix.forEach(d => {
-    const pct = d.count / totalMix;
-    const dash = pct * circumference;
-    const gap  = circumference - dash;
-    paths += `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${d.color}" stroke-width="${strokeW}" stroke-dasharray="${dash} ${gap}" stroke-dashoffset="${-offset}" stroke-linecap="butt" style="transition:stroke-dashoffset 0.8s ease"/>`;
-    offset += dash;
-  });
-  // Center text
-  paths += `<text x="${cx}" y="${cy-6}" text-anchor="middle" font-family="'Bebas Neue',sans-serif" font-size="22" fill="#F2F0EC" letter-spacing="1">${totalMix}</text>`;
-  paths += `<text x="${cx}" y="${cy+12}" text-anchor="middle" font-family="'Barlow Condensed',sans-serif" font-size="10" fill="#6A6E75" letter-spacing="2" text-transform="uppercase">TOTAL</text>`;
-
-  document.getElementById('donutSVG').innerHTML = `<g transform="rotate(-90 ${cx} ${cy})">${paths.split('<text').map((p,i)=>i===0?p:'<text'+p).join('')}</g>`.replace(/<g[^>]*>([\s\S]*)<\/g>/,'') + paths;
-
-  // Correct approach:
   const svgEl = document.getElementById('donutSVG');
   svgEl.innerHTML = '';
-  const g = document.createElementNS('http://www.w3.org/2000/svg','g');
-  g.setAttribute('transform',`rotate(-90 ${cx} ${cy})`);
-  offset = 0;
+
+  if (!totalMix) {
+    document.getElementById('donutLegend').innerHTML = '<div class="legend-empty">No fleet mix data available.</div>';
+    return;
+  }
+
+  let offset = 0;
   fleetMix.forEach(d => {
-    const pct = d.count / totalMix;
+    const pct = totalMix > 0 ? d.count / totalMix : 0;
     const dash = pct * circumference;
-    const gap  = circumference - dash;
-    const circ = document.createElementNS('http://www.w3.org/2000/svg','circle');
-    circ.setAttribute('cx',cx); circ.setAttribute('cy',cy); circ.setAttribute('r',r);
-    circ.setAttribute('fill','none'); circ.setAttribute('stroke',d.color);
-    circ.setAttribute('stroke-width',strokeW);
-    circ.setAttribute('stroke-dasharray',`${dash} ${gap}`);
-    circ.setAttribute('stroke-dashoffset',-offset);
-    g.appendChild(circ);
+    const gap = circumference - dash;
+    const circ = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    circ.setAttribute('cx', cx);
+    circ.setAttribute('cy', cy);
+    circ.setAttribute('r', r);
+    circ.setAttribute('fill', 'none');
+    circ.setAttribute('stroke', d.color);
+    circ.setAttribute('stroke-width', strokeW.toString());
+    circ.setAttribute('stroke-dasharray', `${dash} ${gap}`);
+    circ.setAttribute('stroke-dashoffset', (-offset).toString());
+    circ.setAttribute('stroke-linecap', 'butt');
+    circ.setAttribute('transform', `rotate(-90 ${cx} ${cy})`);
+    svgEl.appendChild(circ);
     offset += dash;
   });
-  svgEl.appendChild(g);
 
-  // Center label
-  const t1 = document.createElementNS('http://www.w3.org/2000/svg','text');
-  t1.setAttribute('x',cx); t1.setAttribute('y',cy+5);
-  t1.setAttribute('text-anchor','middle');
-  t1.setAttribute('font-family',"'Bebas Neue',sans-serif");
-  t1.setAttribute('font-size','26'); t1.setAttribute('fill','#F2F0EC');
-  t1.setAttribute('letter-spacing','1'); t1.textContent = totalMix;
-  svgEl.appendChild(t1);
-  const t2 = document.createElementNS('http://www.w3.org/2000/svg','text');
-  t2.setAttribute('x',cx); t2.setAttribute('y',cy+20);
-  t2.setAttribute('text-anchor','middle');
-  t2.setAttribute('font-family',"'Barlow Condensed',sans-serif");
-  t2.setAttribute('font-size','9'); t2.setAttribute('fill','#6A6E75');
-  t2.setAttribute('letter-spacing','2'); t2.textContent = 'RENTALS';
-  svgEl.appendChild(t2);
+  const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+  label.setAttribute('x', cx.toString());
+  label.setAttribute('y', (cy + 5).toString());
+  label.setAttribute('text-anchor', 'middle');
+  label.setAttribute('font-family', "'Bebas Neue',sans-serif");
+  label.setAttribute('font-size', '26');
+  label.setAttribute('fill', '#F2F0EC');
+  label.setAttribute('letter-spacing', '1');
+  label.textContent = totalMix.toString();
+  svgEl.appendChild(label);
 
-  // Legend
-  document.getElementById('donutLegend').innerHTML = fleetMix.map(d=>`
+  const sublabel = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+  sublabel.setAttribute('x', cx.toString());
+  sublabel.setAttribute('y', (cy + 20).toString());
+  sublabel.setAttribute('text-anchor', 'middle');
+  sublabel.setAttribute('font-family', "'Barlow Condensed',sans-serif");
+  sublabel.setAttribute('font-size', '9');
+  sublabel.setAttribute('fill', '#6A6E75');
+  sublabel.setAttribute('letter-spacing', '2');
+  sublabel.textContent = 'RENTALS';
+  svgEl.appendChild(sublabel);
+
+  document.getElementById('donutLegend').innerHTML = fleetMix.map(d => `
     <div class="legend-row">
       <div class="legend-dot-label">
         <div class="legend-dot" style="background:${d.color}"></div>
         <span class="legend-label">${d.type}</span>
       </div>
-      <div class="legend-val">${d.count} <span style="color:var(--muted);font-weight:400">(${Math.round(d.count/totalMix*100)}%)</span></div>
+      <div class="legend-val">${d.count} <span style="color:var(--muted);font-weight:400">(${totalMix > 0 ? Math.round(d.count / totalMix * 100) : 0}%)</span></div>
     </div>`).join('');
 }
 
 /* ════ RENDER: TOP VEHICLES ════ */
 function renderTopVehicles() {
-  document.getElementById('topVehiclesBody').innerHTML = topVehicles.map((v,i)=>{
-    const pct = (v.revenue/v.max*100).toFixed(0);
+  const body = document.getElementById('topVehiclesBody');
+  if (!topVehicles.length) {
+    body.innerHTML = '<tr><td colspan="3" class="empty-row">No vehicle revenue data available.</td></tr>';
+    return;
+  }
+
+  const maxRevenue = Math.max(...topVehicles.map(v => v.revenue), 1);
+  body.innerHTML = topVehicles.map((v,i)=>{
+    const pct = (v.revenue / maxRevenue * 100).toFixed(0);
     const isTop = i === 0;
     const barColor = isTop ? 'linear-gradient(90deg,var(--red),var(--orange))' : 'linear-gradient(90deg,rgba(61,143,190,0.5),rgba(61,143,190,0.8))';
     return `
@@ -146,14 +200,20 @@ function renderTopVehicles() {
           <div class="rank-sub">${v.plate}</div>
           <div class="rank-bar-track"><div class="rank-bar-fill" style="width:${pct}%;background:${barColor}"></div></div>
         </td>
-        <td><div class="rank-val" style="color:${isTop?'var(--green)':'var(--white)'}">₱${v.revenue.toLocaleString()}</div></td>
+        <td><div class="rank-val" style="color:${isTop?'var(--green)':'var(--white)'}">₱${Number(v.revenue).toLocaleString()}</div></td>
       </tr>`;
   }).join('');
 }
 
 /* ════ RENDER: STATUS GRID ════ */
 function renderStatusGrid() {
-  document.getElementById('statusGrid').innerHTML = statusData.map(s=>`
+  const grid = document.getElementById('statusGrid');
+  if (!statusData.length) {
+    grid.innerHTML = '<div class="status-empty">No rental status data available.</div>';
+    return;
+  }
+
+  grid.innerHTML = statusData.map(s=>`
     <div class="status-tile">
       <div class="status-tile-val" style="color:${s.color}">${s.val}</div>
       <div class="status-tile-lab">${s.label}</div>
@@ -163,7 +223,13 @@ function renderStatusGrid() {
 
 /* ════ RENDER: INSIGHTS ════ */
 function renderInsights() {
-  document.getElementById('insightList').innerHTML = insights.map(i=>`
+  const list = document.getElementById('insightList');
+  if (!insights.length) {
+    list.innerHTML = '<div class="insight-empty">Insufficient data to generate insights.</div>';
+    return;
+  }
+
+  list.innerHTML = insights.map(i=>`
     <div class="insight-item">
       <div class="insight-icon" style="background:${i.iconBg};border:1px solid ${i.iconBdr}">${i.icon}</div>
       <div>
@@ -194,8 +260,4 @@ function showToast(msg) {
 }
 
 /* ════ INIT ════ */
-renderRevenueChart();
-renderDonut();
-renderTopVehicles();
-renderStatusGrid();
-renderInsights();
+loadReport();

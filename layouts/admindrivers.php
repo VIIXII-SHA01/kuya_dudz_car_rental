@@ -64,11 +64,11 @@
               <svg width="15" height="15" viewBox="0 0 15 15" fill="none" color="currentColor"><path d="M5 4h8M5 7.5h8M5 11h8M2 4h.5M2 7.5h.5M2 11h.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
             </button>
           </div>
-          <button class="btn-ghost" onclick="exportCSV()">
+          <button class="btn-ghost" id="exportBtn" onclick="exportCSV()">
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none" color="currentColor"><path d="M2 10v2h10v-2M7 2v7M4 6l3 3 3-3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
             Export
           </button>
-          <button class="btn-primary" onclick="openAddModal()">
+          <button class="btn-primary" id="addDriverBtn" onclick="openAddModal()">
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none" color="white"><path d="M7 2v10M2 7h10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
             <span>Add Driver</span>
           </button>
@@ -77,11 +77,11 @@
 
       <!-- Summary strip -->
       <div class="summary-strip">
-        <div class="sstrip-item"><div class="sstrip-val">12</div><div class="sstrip-lab">Total Drivers</div></div>
-        <div class="sstrip-item"><div class="sstrip-val" style="color:var(--green)">5</div><div class="sstrip-lab">Available</div></div>
-        <div class="sstrip-item"><div class="sstrip-val" style="color:var(--gold)">4</div><div class="sstrip-lab">On Duty</div></div>
-        <div class="sstrip-item"><div class="sstrip-val" style="color:var(--muted2)">2</div><div class="sstrip-lab">Off Duty</div></div>
-        <div class="sstrip-item"><div class="sstrip-val" style="color:var(--red)">1</div><div class="sstrip-lab">Suspended</div></div>
+        <div class="sstrip-item"><div class="sstrip-val" id="totalDriversCount">0</div><div class="sstrip-lab">Total Drivers</div></div>
+        <div class="sstrip-item"><div class="sstrip-val" id="availableDriversCount" style="color:var(--green)">0</div><div class="sstrip-lab">Available</div></div>
+        <div class="sstrip-item"><div class="sstrip-val" id="onDutyDriversCount" style="color:var(--gold)">0</div><div class="sstrip-lab">On Duty</div></div>
+        <div class="sstrip-item"><div class="sstrip-val" id="offDutyDriversCount" style="color:var(--muted2)">0</div><div class="sstrip-lab">Off Duty</div></div>
+        <div class="sstrip-item"><div class="sstrip-val" id="suspendedDriversCount" style="color:var(--red)">0</div><div class="sstrip-lab">Suspended</div></div>
       </div>
 
       <!-- Filter bar -->
@@ -100,7 +100,7 @@
           <option value="senior">Senior (7+ yrs)</option>
         </select>
         <div class="filter-spacer"></div>
-        <div class="results-count" id="resultsCount"><strong>12</strong> drivers</div>
+        <div class="results-count" id="resultsCount"><strong>0</strong> drivers</div>
       </div>
 
       <!-- GRID -->
@@ -138,13 +138,8 @@
           <div class="empty-sub">No drivers match your current filters.</div>
         </div>
         <div class="table-footer">
-          <div class="tf-info" id="tfInfo">Showing <strong>1–10</strong> of <strong>12</strong></div>
-          <div class="pagination">
-            <button class="pg-btn" disabled><svg width="12" height="12" viewBox="0 0 12 12" fill="none" color="currentColor"><path d="M8 2L4 6l4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></button>
-            <button class="pg-btn active">1</button>
-            <button class="pg-btn">2</button>
-            <button class="pg-btn"><svg width="12" height="12" viewBox="0 0 12 12" fill="none" color="currentColor"><path d="M4 2l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></button>
-          </div>
+          <div class="tf-info" id="tfInfo">Showing <strong>0</strong> of <strong>0</strong></div>
+          <div class="pagination" id="pagination"></div>
         </div>
       </div>
 
@@ -246,10 +241,17 @@
       </div>
 
       <div class="section-divider">Documents</div>
-      <div class="upload-zone" onclick="showToast('Document upload — coming soon!','success')">
-        <svg width="26" height="26" viewBox="0 0 26 26" fill="none" color="#E8341A"><rect x="2" y="3" width="16" height="20" rx="2" stroke="currentColor" stroke-width="1.5"/><path d="M6 8h8M6 11.5h8M6 15h5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><path d="M16 18l3 3 5-5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        <div class="upload-label"><strong>Upload License & Documents</strong></div>
-        <div class="upload-sub">PDF, JPG, PNG up to 10MB each</div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Driver Photo</label>
+          <input class="form-input" type="file" id="f-photo" accept="image/jpeg,image/png">
+          <div class="form-help">Upload a profile picture (JPG/PNG).</div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">License / Document</label>
+          <input class="form-input" type="file" id="f-document" accept="application/pdf,image/jpeg,image/png">
+          <div class="form-help">Upload one document at a time.</div>
+        </div>
       </div>
 
       <div class="form-row full" style="margin-top:16px">
@@ -292,13 +294,32 @@
   </div>
 </div>
 
-<!-- TOAST -->
+<!-- DOCUMENT PREVIEW MODAL -->
+<div class="modal-overlay" id="docPreviewModal" onclick="closeModalOutside(event,'docPreviewModal')">
+  <div class="modal" style="max-width:760px;min-height:460px;">
+    <div class="modal-head">
+      <div>
+        <div style="font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--red);margin-bottom:4px">License Preview</div>
+        <div class="modal-title" id="docPreviewTitle">Document</div>
+      </div>
+      <div class="modal-close" onclick="closeModal('docPreviewModal')">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" color="currentColor"><path d="M2 2l10 10M12 2L2 12" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+      </div>
+    </div>
+    <div class="modal-body" style="padding:0;">
+      <iframe id="docPreviewFrame" src="" style="width:100%;height:500px;border:none;" title="Document Preview"></iframe>
+    </div>
+    <div class="modal-footer" style="justify-content:flex-end;">
+      <button class="btn-primary" onclick="closeModal('docPreviewModal')">Close</button>
+    </div>
+  </div>
+</div><!-- TOAST -->
 <div class="toast" id="toast">
   <svg width="15" height="15" viewBox="0 0 15 15" fill="none" id="toastIcon"></svg>
   <span id="toastMsg"></span>
 </div>
 
-<script src="/rent/javascript/admindrivers.js"></script>
+<script src="/rent/javascript/admindrivers.js?v=2"></script>
 <script src="/rent/javascript/admindashboard.js"></script>
 </body>
 </html>

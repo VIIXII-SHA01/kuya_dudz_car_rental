@@ -173,17 +173,6 @@
   .act-btn:hover { border-color:var(--border2); color:var(--white); }
   .act-btn.del:hover { border-color:rgba(232,52,26,0.5); color:var(--red); background:var(--red-dim); }
 
-  /* Location / Branch cards */
-  .branch-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
-  .branch-card { background:var(--card2); border:1px solid var(--border); border-radius:3px; padding:16px; position:relative; }
-  .branch-card.primary::before { content:''; position:absolute; top:0; left:0; right:0; height:2px; background:var(--red); border-radius:2px 2px 0 0; }
-  .branch-name { font-family:'Bebas Neue',sans-serif; font-size:16px; letter-spacing:1.5px; margin-bottom:4px; }
-  .branch-addr { font-size:12px; color:var(--muted2); font-weight:300; line-height:1.5; margin-bottom:10px; }
-  .branch-tag { font-size:9.5px; font-family:'Barlow Condensed',sans-serif; letter-spacing:1.5px; text-transform:uppercase; padding:2px 8px; border-radius:2px; display:inline-flex; }
-  .branch-tag.main { background:var(--red-dim); color:var(--red); border:1px solid rgba(232,52,26,0.25); }
-  .branch-tag.active { background:var(--green-dim); color:var(--green); border:1px solid rgba(61,190,122,0.25); }
-  .branch-actions { display:flex; gap:6px; margin-top:12px; }
-
   /* Section divider */
   .section-div { font-size:10px; letter-spacing:2px; text-transform:uppercase; color:var(--muted); font-weight:500; margin-bottom:14px; display:flex; align-items:center; gap:10px; }
   .section-div::after { content:''; flex:1; height:1px; background:var(--border); }
@@ -233,4 +222,4 @@
   @media (max-width:1100px) { .sidebar{width:200px} .main{margin-left:200px} }
   @media (max-width:960px)  { .settings-layout{grid-template-columns:1fr} .settings-nav{position:static} }
   @media (max-width:860px)  { .sidebar{transform:translateX(-100%);z-index:100;transition:transform 0.3s ease} .sidebar.open{transform:translateX(0);box-shadow:4px 0 32px rgba(0,0,0,0.5)} .main{margin-left:0} .content{padding:20px 16px} .topbar{padding:0 16px} .menu-toggle{display:flex} }
-  @media (max-width:640px)  { .form-row,.form-row.three{grid-template-columns:1fr} .branch-grid{grid-template-columns:1fr} }
+  @media (max-width:640px)  { .form-row,.form-row.three{grid-template-columns:1fr} }

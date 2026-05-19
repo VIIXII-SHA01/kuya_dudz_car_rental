@@ -7,13 +7,40 @@ $bookingSummary = [
   'active' => 0,
   'pending' => 0,
   'done' => 0,
+  'overdue' => 0,
   'canceled' => 0,
 ];
 
+function ensureBookingSchema(PDO $conn): void {
+    $alterStatements = [
+        "ALTER TABLE bookings ADD COLUMN customer_ref VARCHAR(32) DEFAULT NULL",
+        "ALTER TABLE bookings ADD COLUMN vehicle_type VARCHAR(80) DEFAULT NULL",
+        "ALTER TABLE bookings ADD COLUMN driver_type VARCHAR(50) DEFAULT NULL",
+        "ALTER TABLE bookings ADD COLUMN location VARCHAR(255) DEFAULT NULL",
+        "ALTER TABLE bookings ADD COLUMN rate DECIMAL(10,2) NOT NULL DEFAULT 0.00",
+        "ALTER TABLE bookings MODIFY COLUMN status ENUM('pending','active','done','canceled','overdue') NOT NULL DEFAULT 'pending'"
+    ];
+
+    foreach ($alterStatements as $sql) {
+        try {
+            $conn->exec($sql);
+        } catch (PDOException $e) {
+            // ignore if the column already exists or if the modification is not applicable
+        }
+    }
+}
+
 try {
+    ensureBookingSchema($conn);
+
     $stmt = $conn->prepare(
         'SELECT
             b.booking_ref AS id,
+            b.customer_ref,
+            b.vehicle_type,
+            b.driver_type,
+            b.location,
+            b.rate,
             b.pickup_date,
             b.return_date,
             b.days,
@@ -45,8 +72,13 @@ try {
         $bookings[] = [
             'id' => $row['id'] ?? 'BK-0000',
             'customer' => $customerName !== '' ? $customerName : 'Guest Customer',
+            'customer_ref' => $row['customer_ref'] ?: '—',
             'email' => $row['cust_email'] ?: '—',
             'vehicle' => $vehicleName !== '' ? $vehicleName : ($row['plate_no'] ? 'Fleet Vehicle' : 'Unknown'),
+            'vehicle_type' => $row['vehicle_type'] ?: 'Standard',
+            'driver_type' => $row['driver_type'] ?: 'Self-drive',
+            'location' => $row['location'] ?: '—',
+            'rate' => (float) $row['rate'],
             'plate' => $row['plate_no'] ?: '—',
             'pickup' => $pickup,
             'ret' => $return,
@@ -285,10 +317,12 @@ try {
   .badge-dot { width: 5px; height: 5px; border-radius: 50%; }
   .badge.active   { background: var(--green-dim); color: var(--green);  border: 1px solid rgba(61,190,122,0.25); }
   .badge.pending  { background: var(--gold-dim);  color: var(--gold);   border: 1px solid rgba(212,168,67,0.25); }
+  .badge.overdue  { background: rgba(255, 144, 0, 0.12);  color: #ff8f00; border: 1px solid rgba(255,144,0,0.2); }
   .badge.done     { background: var(--blue-dim);  color: var(--blue);   border: 1px solid rgba(61,143,190,0.25); }
   .badge.canceled { background: var(--red-dim);   color: #ff6b54;       border: 1px solid rgba(232,52,26,0.25); }
   .badge.active .badge-dot { background: var(--green); animation: blink 2s ease-in-out infinite; }
   .badge.pending .badge-dot { background: var(--gold); }
+  .badge.overdue .badge-dot { background: #ff8f00; }
   .badge.done .badge-dot { background: var(--blue); }
   .badge.canceled .badge-dot { background: #ff6b54; }
   @keyframes blink { 0%,100%{opacity:1}50%{opacity:0.3} }
@@ -420,8 +454,8 @@ try {
       <div class="page-header">
         <div>
           <div class="page-eyebrow">Fleet Management</div>
-          <div class="page-title">Booking List</div>
-          <div class="page-sub">Manage and track all vehicle reservations</div>
+          <div class="page-title">Bookings & Rentals</div>
+          <div class="page-sub">Manage and track all vehicle reservations and rental details</div>
         </div>
         <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
           <button class="btn-ghost" onclick="exportCSV()">
@@ -441,6 +475,7 @@ try {
         <div class="sstrip-item"><div class="sstrip-val" id="summaryActive" style="color:var(--green)"><?php echo $bookingSummary['active']; ?></div><div class="sstrip-lab">Active Rentals</div></div>
         <div class="sstrip-item"><div class="sstrip-val" id="summaryPending" style="color:var(--gold)"><?php echo $bookingSummary['pending']; ?></div><div class="sstrip-lab">Pending</div></div>
         <div class="sstrip-item"><div class="sstrip-val" id="summaryDone" style="color:var(--blue)"><?php echo $bookingSummary['done']; ?></div><div class="sstrip-lab">Completed</div></div>
+        <div class="sstrip-item"><div class="sstrip-val" id="summaryOverdue" style="color:var(--orange)">0</div><div class="sstrip-lab">Overdue</div></div>
         <div class="sstrip-item"><div class="sstrip-val" id="summaryCanceled" style="color:var(--red)"><?php echo $bookingSummary['canceled']; ?></div><div class="sstrip-lab">Canceled</div></div>
       </div>
 
@@ -451,6 +486,7 @@ try {
           <button class="ftab" onclick="setFilter('active',this)">Active</button>
           <button class="ftab" onclick="setFilter('pending',this)">Pending</button>
           <button class="ftab" onclick="setFilter('done',this)">Completed</button>
+          <button class="ftab" onclick="setFilter('overdue',this)">Overdue</button>
           <button class="ftab" onclick="setFilter('canceled',this)">Canceled</button>
         </div>
         <select class="filter-select" onchange="filterTable()">
@@ -531,7 +567,10 @@ try {
     <div class="modal-body">
       <div class="form-row">
         <div class="form-group"><label class="form-label">Customer Name</label><input class="form-input" id="f-customer" placeholder="Full name"></div>
-        <div class="form-group"><label class="form-label">Contact / Email</label><input class="form-input" id="f-email" placeholder="email@example.com"></div>
+        <div class="form-group"><label class="form-label">Customer ID</label><input class="form-input" id="f-customer-ref" placeholder="e.g. CUST-0042"></div>
+      </div>
+      <div class="form-row full">
+        <div class="form-group"><label class="form-label">Customer Email</label><input class="form-input" id="f-email" placeholder="customer@example.com" type="email"></div>
       </div>
       <div class="form-row">
         <div class="form-group">
@@ -549,16 +588,36 @@ try {
         <div class="form-group"><label class="form-label">Plate Number</label><input class="form-input" id="f-plate" placeholder="e.g. ABC-1234"></div>
       </div>
       <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Vehicle Type</label>
+          <select class="form-select" id="f-vehicle-type">
+            <option value="">Choose type…</option>
+            <option>Sedan</option>
+            <option>SUV</option>
+            <option>Compact</option>
+            <option>MPV</option>
+            <option>Premium</option>
+            <option>Electric</option>
+          </select>
+        </div>
+        <div class="form-group"><label class="form-label">Driver Type</label><select class="form-select" id="f-driver-type"><option value="Self-drive">Self-drive</option><option value="With driver">With driver</option></select></div>
+      </div>
+      <div class="form-row">
         <div class="form-group"><label class="form-label">Pickup Date</label><input class="form-input" id="f-pickup" type="date"></div>
         <div class="form-group"><label class="form-label">Return Date</label><input class="form-input" id="f-return" type="date"></div>
       </div>
       <div class="form-row">
-        <div class="form-group"><label class="form-label">Amount (₱)</label><input class="form-input" id="f-amount" type="number" placeholder="0.00"></div>
+        <div class="form-group"><label class="form-label">Location</label><input class="form-input" id="f-location" placeholder="Pickup location"></div>
+        <div class="form-group"><label class="form-label">Rate (₱/day)</label><input class="form-input" id="f-rate" type="number" placeholder="0.00"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Total Amount (₱)</label><input class="form-input" id="f-amount" type="number" placeholder="0.00"></div>
         <div class="form-group">
           <label class="form-label">Status</label>
           <select class="form-select" id="f-status">
             <option value="pending">Pending</option>
             <option value="active">Active</option>
+            <option value="overdue">Overdue</option>
             <option value="done">Completed</option>
             <option value="canceled">Canceled</option>
           </select>
@@ -656,19 +715,25 @@ function initials(name) { return name.split(' ').map(w=>w[0]).join('').slice(0,2
 function avatarBg(name) { return AVATARS[name.charCodeAt(0) % AVATARS.length]; }
 
 function statusBadge(s) {
-  const map = { active:['active','Active'], pending:['pending','Pending'], done:['done','Completed'], canceled:['canceled','Canceled'] };
+  const map = {
+    active:['active','Active'],
+    pending:['pending','Pending'],
+    overdue:['overdue','Overdue'],
+    done:['done','Completed'],
+    canceled:['canceled','Canceled']
+  };
   const [cls, label] = map[s] || ['pending','Unknown'];
   return `<span class="badge ${cls}"><span class="badge-dot"></span>${label}</span>`;
 }
 function amountColor(s) {
-  return s==='active'?'var(--green)':s==='pending'?'var(--gold)':s==='done'?'var(--blue)':'var(--muted)';
+  return s==='active' ? 'var(--green)' : s==='pending' ? 'var(--gold)' : s==='overdue' ? '#ff8f00' : s==='done' ? 'var(--blue)' : 'var(--muted)';
 }
 
 function renderTable() {
   const data = bookings.filter(b => {
     const matchFilter = currentFilter==='all' || b.status===currentFilter;
     const q = currentSearch.toLowerCase();
-    const matchSearch = !q || b.id.toLowerCase().includes(q) || b.customer.toLowerCase().includes(q) || b.vehicle.toLowerCase().includes(q) || b.plate.toLowerCase().includes(q) || b.email.toLowerCase().includes(q);
+    const matchSearch = !q || b.id.toLowerCase().includes(q) || b.customer.toLowerCase().includes(q) || b.customer_ref.toLowerCase().includes(q) || b.vehicle.toLowerCase().includes(q) || b.vehicle_type.toLowerCase().includes(q) || b.driver_type.toLowerCase().includes(q) || b.location.toLowerCase().includes(q) || b.plate.toLowerCase().includes(q) || b.email.toLowerCase().includes(q);
     return matchFilter && matchSearch;
   });
 
@@ -699,7 +764,7 @@ function renderTable() {
           <div><div class="cust-name">${b.customer}</div><div class="cust-email">${b.email}</div></div>
         </div>
       </td>
-      <td><div class="car-name">${b.vehicle}</div><div class="car-type">Sedan</div></td>
+      <td><div class="car-name">${b.vehicle}</div><div class="car-type">${b.vehicle_type || 'Sedan'}</div></td>
       <td><span class="plate"><svg width="11" height="11" viewBox="0 0 11 11" fill="none" color="#6A6E75"><rect x="1" y="2.5" width="9" height="6" rx="1" stroke="currentColor" stroke-width="1.1"/></svg>${b.plate}</span></td>
       <td><div class="date-main">${b.pickup}</div><div class="date-day">Pickup</div></td>
       <td><div class="date-main">${b.ret}</div><div class="date-day">Return</div></td>
@@ -812,18 +877,23 @@ function closeModalOutside(e) {
 
 function fillModalFields(booking) {
   document.getElementById('f-customer').value = booking?.customer || '';
+  document.getElementById('f-customer-ref').value = booking?.customer_ref || '';
   document.getElementById('f-email').value = booking?.email || '';
   document.getElementById('f-vehicle').value = booking?.vehicle || '';
+  document.getElementById('f-vehicle-type').value = booking?.vehicle_type || '';
+  document.getElementById('f-driver-type').value = booking?.driver_type || 'Self-drive';
+  document.getElementById('f-location').value = booking?.location || '';
   document.getElementById('f-plate').value = booking?.plate || '';
   document.getElementById('f-pickup').value = booking?.pickup ? formatInputDate(booking.pickup) : '';
   document.getElementById('f-return').value = booking?.ret ? formatInputDate(booking.ret) : '';
+  document.getElementById('f-rate').value = booking?.rate ?? '';
   document.getElementById('f-amount').value = booking?.amount ?? '';
   document.getElementById('f-status').value = booking?.status || 'pending';
   document.getElementById('f-notes').value = booking?.notes || '';
 }
 
 function toggleModalFields(disabled) {
-  ['f-customer','f-email','f-vehicle','f-plate','f-pickup','f-return','f-amount','f-status','f-notes'].forEach(id => {
+  ['f-customer','f-customer-ref','f-email','f-vehicle','f-vehicle-type','f-driver-type','f-location','f-plate','f-pickup','f-return','f-rate','f-amount','f-status','f-notes'].forEach(id => {
     const input = document.getElementById(id);
     if (input) input.disabled = disabled;
   });
@@ -841,11 +911,16 @@ function formatInputDate(value) {
 function getModalData() {
   return {
     customer: document.getElementById('f-customer').value.trim(),
+    customer_ref: document.getElementById('f-customer-ref').value.trim(),
     email: document.getElementById('f-email').value.trim(),
     vehicle: document.getElementById('f-vehicle').value,
+    vehicle_type: document.getElementById('f-vehicle-type').value,
+    driver_type: document.getElementById('f-driver-type').value,
+    location: document.getElementById('f-location').value.trim(),
     plate: document.getElementById('f-plate').value.trim(),
     pickup_date: document.getElementById('f-pickup').value,
     return_date: document.getElementById('f-return').value,
+    rate: parseFloat(document.getElementById('f-rate').value) || 0,
     amount: parseFloat(document.getElementById('f-amount').value) || 0,
     status: document.getElementById('f-status').value,
     notes: document.getElementById('f-notes').value.trim(),
@@ -857,11 +932,12 @@ function updateSummaryCounts() {
     acc.total += 1;
     acc[b.status] = (acc[b.status] || 0) + 1;
     return acc;
-  }, { total: 0, active: 0, pending: 0, done: 0, canceled: 0 });
+  }, { total: 0, active: 0, pending: 0, done: 0, overdue: 0, canceled: 0 });
   document.getElementById('summaryTotal').textContent = counts.total;
   document.getElementById('summaryActive').textContent = counts.active;
   document.getElementById('summaryPending').textContent = counts.pending;
   document.getElementById('summaryDone').textContent = counts.done;
+  document.getElementById('summaryOverdue').textContent = counts.overdue;
   document.getElementById('summaryCanceled').textContent = counts.canceled;
 }
 
@@ -937,6 +1013,15 @@ function showToast(msg, type='error') {
   t.classList.add('show');
   setTimeout(() => t.classList.remove('show'), 3400);
 }
+
+window.addEventListener('error', event => {
+  showToast('JS error: ' + (event.message || 'Unknown error'), 'error');
+  console.error(event.error || event.message, event.error);
+});
+window.addEventListener('unhandledrejection', event => {
+  showToast('Unhandled promise error', 'error');
+  console.error('Unhandled promise rejection:', event.reason);
+});
 
 renderTable();
 </script>

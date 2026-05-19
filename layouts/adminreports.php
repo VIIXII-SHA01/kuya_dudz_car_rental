@@ -80,38 +80,26 @@
       <div class="kpi-strip">
         <div class="kpi-card k-green">
           <div class="kpi-label">Total Revenue</div>
-          <div class="kpi-value k-green" id="kpi-revenue">₱273,600</div>
-          <div class="kpi-delta up">
-            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" color="currentColor"><path d="M6 9V3M3 6l3-3 3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-            +18.4% vs last quarter
-          </div>
+          <div class="kpi-value k-green" id="kpi-revenue">₱0</div>
+          <div class="kpi-delta up" id="kpi-revenue-delta"></div>
           <div class="kpi-bg-icon"><svg width="72" height="72" viewBox="0 0 72 72" fill="none" color="white"><path d="M12 54l18-22 14 14 20-30" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
         </div>
         <div class="kpi-card k-blue">
           <div class="kpi-label">Total Rentals</div>
-          <div class="kpi-value k-blue" id="kpi-rentals">16</div>
-          <div class="kpi-delta up">
-            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" color="currentColor"><path d="M6 9V3M3 6l3-3 3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-            +5 vs last quarter
-          </div>
+          <div class="kpi-value k-blue" id="kpi-rentals">0</div>
+          <div class="kpi-delta up" id="kpi-rentals-delta"></div>
           <div class="kpi-bg-icon"><svg width="72" height="72" viewBox="0 0 72 72" fill="none" color="white"><path d="M8 44L22 20h28l14 24" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><rect x="6" y="43" width="60" height="14" rx="5" stroke="currentColor" stroke-width="3"/><circle cx="18" cy="57" r="5" stroke="currentColor" stroke-width="3"/><circle cx="54" cy="57" r="5" stroke="currentColor" stroke-width="3"/></svg></div>
         </div>
         <div class="kpi-card k-gold">
           <div class="kpi-label">Avg Rental Value</div>
-          <div class="kpi-value k-gold" id="kpi-avg">₱17,100</div>
-          <div class="kpi-delta up">
-            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" color="currentColor"><path d="M6 9V3M3 6l3-3 3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-            +₱2,340 vs last quarter
-          </div>
+          <div class="kpi-value k-gold" id="kpi-avg">₱0</div>
+          <div class="kpi-delta up" id="kpi-avg-delta"></div>
           <div class="kpi-bg-icon"><svg width="72" height="72" viewBox="0 0 72 72" fill="none" color="white"><circle cx="36" cy="36" r="28" stroke="currentColor" stroke-width="3"/><path d="M36 22v28M28 30l8-8 8 8" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
         </div>
         <div class="kpi-card k-red">
           <div class="kpi-label">Overdue / Unpaid</div>
-          <div class="kpi-value k-red" id="kpi-overdue">₱36,800</div>
-          <div class="kpi-delta down">
-            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" color="currentColor"><path d="M6 3v6M3 6l3 3 3-3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-            2 overdue rentals pending
-          </div>
+          <div class="kpi-value k-red" id="kpi-overdue">₱0</div>
+          <div class="kpi-delta down" id="kpi-overdue-delta"></div>
           <div class="kpi-bg-icon"><svg width="72" height="72" viewBox="0 0 72 72" fill="none" color="white"><circle cx="36" cy="36" r="28" stroke="currentColor" stroke-width="3"/><path d="M36 24v16M36 46v4" stroke="currentColor" stroke-width="3.5" stroke-linecap="round"/></svg></div>
         </div>
       </div>
@@ -153,30 +141,21 @@
       <div class="charts-row2">
         <div class="metric-card">
           <div class="metric-label">Avg Days per Rental</div>
-          <div class="metric-value" style="color:var(--blue)">3.7</div>
+          <div class="metric-value" id="metric-days" style="color:var(--blue)">—</div>
           <div class="metric-sub">Days · Q1 2026</div>
-          <svg class="sparkline" viewBox="0 0 200 50" preserveAspectRatio="none">
-            <polyline points="0,40 40,30 80,35 120,20 160,22 200,10" fill="none" stroke="var(--blue)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" opacity="0.7"/>
-            <polyline points="0,50 0,40 40,30 80,35 120,20 160,22 200,10 200,50" fill="var(--blue)" opacity="0.08"/>
-          </svg>
+          <div class="metric-chart" id="metric-days-chart"><div class="metric-chart-empty">No data</div></div>
         </div>
         <div class="metric-card">
           <div class="metric-label">Fleet Utilization</div>
-          <div class="metric-value" style="color:var(--gold)">68%</div>
+          <div class="metric-value" id="metric-utilization" style="color:var(--gold)">—</div>
           <div class="metric-sub">Avg active vehicles per day</div>
-          <svg class="sparkline" viewBox="0 0 200 50" preserveAspectRatio="none">
-            <polyline points="0,35 40,28 80,32 120,18 160,25 200,15" fill="none" stroke="var(--gold)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" opacity="0.7"/>
-            <polyline points="0,50 0,35 40,28 80,32 120,18 160,25 200,15 200,50" fill="var(--gold)" opacity="0.08"/>
-          </svg>
+          <div class="metric-chart" id="metric-utilization-chart"><div class="metric-chart-empty">No data</div></div>
         </div>
         <div class="metric-card">
           <div class="metric-label">Repeat Customers</div>
-          <div class="metric-value" style="color:var(--green)">44%</div>
+          <div class="metric-value" id="metric-repeat" style="color:var(--green)">—</div>
           <div class="metric-sub">Returning renters this quarter</div>
-          <svg class="sparkline" viewBox="0 0 200 50" preserveAspectRatio="none">
-            <polyline points="0,42 40,38 80,30 120,26 160,20 200,14" fill="none" stroke="var(--green)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" opacity="0.7"/>
-            <polyline points="0,50 0,42 40,38 80,30 120,26 160,20 200,14 200,50" fill="var(--green)" opacity="0.08"/>
-          </svg>
+          <div class="metric-chart" id="metric-repeat-chart"><div class="metric-chart-empty">No data</div></div>
         </div>
       </div>
 

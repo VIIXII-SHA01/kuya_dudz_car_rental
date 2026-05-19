@@ -459,7 +459,33 @@
     font-size: 14px;
     color: var(--muted2);
     font-weight: 300;
-    margin-bottom: 36px;
+    margin-bottom: 24px;
+  }
+
+  .server-message {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 16px 18px;
+    border: 1px solid rgba(232,52,26,0.25);
+    border-radius: 5px;
+    background: rgba(232,52,26,0.08);
+    margin-bottom: 22px;
+  }
+  .server-message-icon {
+    font-size: 18px;
+    line-height: 1;
+    margin-top: 2px;
+  }
+  .server-message-title {
+    font-weight: 700;
+    color: var(--white);
+    margin-bottom: 4px;
+  }
+  .server-message-text {
+    color: var(--muted2);
+    line-height: 1.5;
+    font-size: 14px;
   }
 
   /* Inputs */

@@ -179,10 +179,6 @@
       <div class="form-title">Sign In</div>
       <div class="form-subtitle">Enter your credentials to access your account.</div>
 
-<?php if (!empty($_GET['error']) && $_GET['error'] === 'invalid'): ?>
-      <div class="server-message error">Invalid email or password. Please try again.</div>
-<?php endif; ?>
-
       <form id="loginForm" method="post" action="/rent/php/login_action.php" novalidate>
 
         <!-- Email -->

@@ -1,3 +1,67 @@
+<?php
+require_once __DIR__ . '/../databases/connection1.php';
+
+$customers = [];
+$customersLoaded = false;
+$customerSummary = ['total' => 0, 'active' => 0, 'vip' => 0, 'inactive' => 0, 'blacklisted' => 0];
+
+function formatCustomer(array $row): array {
+    $documents = [];
+    if (!empty($row['documents'])) {
+        $decoded = json_decode($row['documents'], true);
+        if (is_array($decoded)) {
+            foreach ($decoded as $doc) {
+                if (is_string($doc)) {
+                    $documents[] = ['file' => '/rent/' . ltrim($doc, '/\\')];
+                } elseif (is_array($doc) && isset($doc['file'])) {
+                    $documents[] = ['file' => '/rent/' . ltrim($doc['file'], '/\\')];
+                }
+            }
+        }
+    }
+
+    return [
+        'id' => (int) ($row['id'] ?? 0),
+        'fname' => $row['first_name'] ?? '',
+        'lname' => $row['last_name'] ?? '',
+        'email' => $row['email'] ?? '',
+        'phone' => $row['phone'] ?? '',
+        'dob' => $row['dob'] ?? '',
+        'address' => $row['address'] ?? '',
+        'idtype' => $row['id_type'] ?? $row['idtype'] ?? "Driver's License",
+        'idnum' => $row['id_number'] ?? $row['idnum'] ?? '',
+        'emergency' => $row['emergency_contact'] ?? $row['emergency'] ?? '',
+        'tier' => $row['membership_tier'] ?? $row['tier'] ?? 'Basic',
+        'status' => $row['status'] ?? 'active',
+        'rentals' => isset($row['rentals']) ? (int) $row['rentals'] : 0,
+        'spent' => isset($row['spent']) ? (float) $row['spent'] : 0.0,
+        'joined' => $row['joined'] ?? ($row['created_at'] ?? ''),
+        'notes' => trim($row['notes'] ?? ''),
+        'bg' => $row['avatar_bg'] ?? 'linear-gradient(135deg,#3D8FBE,#3DBE7A)',
+        'photo' => !empty($row['profile_photo']) ? '/rent/' . ltrim($row['profile_photo'], '/\\') : null,
+        'documents' => $documents,
+    ];
+}
+
+try {
+    $summaryStmt = $conn->query('SELECT status, COUNT(*) AS cnt FROM customers GROUP BY status');
+    while ($row = $summaryStmt->fetch(PDO::FETCH_ASSOC)) {
+        $status = $row['status'] ?? 'active';
+        if (array_key_exists($status, $customerSummary)) {
+            $customerSummary[$status] = (int) $row['cnt'];
+        }
+        $customerSummary['total'] += (int) $row['cnt'];
+    }
+
+    $stmt = $conn->query('SELECT * FROM customers ORDER BY id DESC');
+    while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+        $customers[] = formatCustomer($row);
+    }
+    $customersLoaded = true;
+} catch (PDOException $e) {
+    // Leave fallback data available if the database query fails.
+}
+?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -77,11 +141,11 @@
 
       <!-- Summary strip -->
       <div class="summary-strip">
-        <div class="sstrip-item"><div class="sstrip-val">14</div><div class="sstrip-lab">Total Customers</div></div>
-        <div class="sstrip-item"><div class="sstrip-val" style="color:var(--green)">10</div><div class="sstrip-lab">Active</div></div>
-        <div class="sstrip-item"><div class="sstrip-val" style="color:var(--gold)">3</div><div class="sstrip-lab">VIP</div></div>
-        <div class="sstrip-item"><div class="sstrip-val" style="color:var(--muted2)">3</div><div class="sstrip-lab">Inactive</div></div>
-        <div class="sstrip-item"><div class="sstrip-val" style="color:var(--red)">1</div><div class="sstrip-lab">Blacklisted</div></div>
+        <div class="sstrip-item"><div class="sstrip-val"><?php echo $customerSummary['total']; ?></div><div class="sstrip-lab">Total Customers</div></div>
+        <div class="sstrip-item"><div class="sstrip-val" style="color:var(--green)"><?php echo $customerSummary['active']; ?></div><div class="sstrip-lab">Active</div></div>
+        <div class="sstrip-item"><div class="sstrip-val" style="color:var(--gold)"><?php echo $customerSummary['vip']; ?></div><div class="sstrip-lab">VIP</div></div>
+        <div class="sstrip-item"><div class="sstrip-val" style="color:var(--muted2)"><?php echo $customerSummary['inactive']; ?></div><div class="sstrip-lab">Inactive</div></div>
+        <div class="sstrip-item"><div class="sstrip-val" style="color:var(--red)"><?php echo $customerSummary['blacklisted']; ?></div><div class="sstrip-lab">Blacklisted</div></div>
       </div>
 
       <!-- Filter bar -->
@@ -101,7 +165,7 @@
           <option value="Platinum">Platinum</option>
         </select>
         <div class="filter-spacer"></div>
-        <div class="results-count" id="resultsCount"><strong>14</strong> customers</div>
+        <div class="results-count" id="resultsCount"><strong><?php echo $customerSummary['total']; ?></strong> customers</div>
       </div>
 
       <!-- GRID -->
@@ -139,7 +203,7 @@
           <div class="empty-sub">No customers match your current filters.</div>
         </div>
         <div class="table-footer">
-          <div class="tf-info" id="tfInfo">Showing <strong>1–10</strong> of <strong>14</strong></div>
+          <div class="tf-info" id="tfInfo"><?php echo $customerSummary['total'] > 0 ? 'Showing <strong>1–'.min(10, $customerSummary['total']).'</strong> of <strong>'.$customerSummary['total'].'</strong>' : 'No results'; ?></div>
           <div class="pagination">
             <button class="pg-btn" disabled><svg width="12" height="12" viewBox="0 0 12 12" fill="none" color="currentColor"><path d="M8 2L4 6l4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></button>
             <button class="pg-btn active">1</button>
@@ -254,6 +318,20 @@
         </div>
       </div>
 
+      <div class="section-divider">Documents</div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Customer Photo</label>
+          <input class="form-input" type="file" id="f-photo" accept="image/jpeg,image/png">
+          <div class="form-help">Upload a profile photo for the customer.</div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">ID Document</label>
+          <input class="form-input" type="file" id="f-document" accept="application/pdf,image/jpeg,image/png">
+          <div class="form-help">Upload a single ID document file.</div>
+        </div>
+      </div>
+
       <div class="form-row full" style="margin-top:4px">
         <div class="form-group">
           <label class="form-label">Notes (optional)</label>
@@ -294,13 +372,37 @@
   </div>
 </div>
 
+<!-- DOCUMENT PREVIEW MODAL -->
+<div class="modal-overlay" id="docPreviewModal" onclick="closeModalOutside(event,'docPreviewModal')">
+  <div class="modal" style="max-width:760px;min-height:460px;">
+    <div class="modal-head">
+      <div>
+        <div style="font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--red);margin-bottom:4px">Document Preview</div>
+        <div class="modal-title" id="docPreviewTitle">Document</div>
+      </div>
+      <div class="modal-close" onclick="closeModal('docPreviewModal')">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" color="currentColor"><path d="M2 2l10 10M12 2L2 12" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+      </div>
+    </div>
+    <div class="modal-body" style="padding:0;">
+      <iframe id="docPreviewFrame" src="" style="width:100%;height:500px;border:none;" title="Document Preview"></iframe>
+    </div>
+    <div class="modal-footer" style="justify-content:flex-end;">
+      <button class="btn-primary" onclick="closeModal('docPreviewModal')">Close</button>
+    </div>
+  </div>
+</div>
+
 <!-- TOAST -->
 <div class="toast" id="toast">
   <svg width="15" height="15" viewBox="0 0 15 15" fill="none" id="toastIcon"></svg>
   <span id="toastMsg"></span>
 </div>
 
-<script src="/rent/javascript/admincustomers.js"></script>
+<script>
+window.serverCustomers = <?php echo $customersLoaded ? json_encode($customers, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP) : 'undefined'; ?>;
+</script>
+<script src="/rent/javascript/admincustomers.js?v=<?php echo filemtime(__DIR__ . '/../javascript/admincustomers.js'); ?>"></script>
 <script src="/rent/javascript/admindashboard.js"></script>
 </body>
 </html>

@@ -23,25 +23,46 @@ function updateInitials() {
 }
 
 /* ════ DATA ════ */
-let drivers = [
-  { id:1,  fname:'Marco',   lname:'Reyes',      email:'marco@revv.ph',   phone:'+63 917 111 2233', dob:'1990-03-15', address:'Cebu City',          license:'N01-23-456789', expiry:'2026-08-10', exp:8,  lictype:'Professional',    status:'available', rating:4.9, trips:312, notes:'',                              bg:GRADS[0] },
-  { id:2,  fname:'Dan',     lname:'Santos',     email:'dan@revv.ph',     phone:'+63 918 222 3344', dob:'1992-07-22', address:'Mandaue City',        license:'N01-20-123456', expiry:'2025-12-31', exp:5,  lictype:'Professional',    status:'on-duty',   rating:4.7, trips:198, notes:'Currently with booking BK-0091', bg:GRADS[1] },
-  { id:3,  fname:'Lea',     lname:'Villanueva', email:'lea@revv.ph',     phone:'+63 919 333 4455', dob:'1995-01-10', address:'Lapu-Lapu City',      license:'N01-21-234567', expiry:'2027-03-20', exp:3,  lictype:'Professional',    status:'available', rating:4.8, trips:145, notes:'',                              bg:GRADS[2] },
-  { id:4,  fname:'Rico',    lname:'Bautista',   email:'rico@revv.ph',    phone:'+63 920 444 5566', dob:'1988-11-05', address:'Talisay City',        license:'N01-18-345678', expiry:'2026-05-15', exp:10, lictype:'Professional',    status:'on-duty',   rating:4.6, trips:421, notes:'Senior driver — preferred for SUVs', bg:GRADS[3] },
-  { id:5,  fname:'Mia',     lname:'Gonzales',   email:'mia@revv.ph',     phone:'+63 921 555 6677', dob:'1997-06-18', address:'Consolacion, Cebu',   license:'N01-22-456789', expiry:'2027-11-08', exp:2,  lictype:'Professional',    status:'available', rating:4.5, trips:87,  notes:'',                              bg:GRADS[4] },
-  { id:6,  fname:'Jake',    lname:'Torres',     email:'jake@revv.ph',    phone:'+63 922 666 7788', dob:'1985-09-30', address:'Minglanilla, Cebu',   license:'N01-15-567890', expiry:'2024-09-30', exp:14, lictype:'Professional',    status:'off-duty',  rating:4.3, trips:634, notes:'On leave until April 20',       bg:GRADS[5] },
-  { id:7,  fname:'Sofia',   lname:'Lim',        email:'sofia@revv.ph',   phone:'+63 923 777 8899', dob:'1993-04-12', address:'Carcar City, Cebu',   license:'N01-19-678901', expiry:'2026-07-22', exp:6,  lictype:'Professional',    status:'on-duty',   rating:4.8, trips:267, notes:'',                              bg:GRADS[0] },
-  { id:8,  fname:'Luis',    lname:'Navarro',    email:'luis@revv.ph',    phone:'+63 924 888 9900', dob:'1991-12-25', address:'Toledo City, Cebu',   license:'N01-17-789012', expiry:'2025-06-14', exp:9,  lictype:'Professional',    status:'available', rating:4.7, trips:389, notes:'',                              bg:GRADS[1] },
-  { id:9,  fname:'Grace',   lname:'Mendoza',    email:'grace@revv.ph',   phone:'+63 925 999 0011', dob:'1996-08-07', address:'Naga City, Cebu',     license:'N01-22-890123', expiry:'2028-01-30', exp:2,  lictype:'Non-Professional',status:'available', rating:4.4, trips:63,  notes:'',                              bg:GRADS[2] },
-  { id:10, fname:'Ryan',    lname:'Cruz',       email:'ryan@revv.ph',    phone:'+63 926 000 1122', dob:'1989-02-14', address:'Danao City, Cebu',    license:'N01-16-901234', expiry:'2025-10-05', exp:12, lictype:'Professional',    status:'on-duty',   rating:4.9, trips:511, notes:'Top-rated driver',              bg:GRADS[3] },
-  { id:11, fname:'Trish',   lname:'Aquino',     email:'trish@revv.ph',   phone:'+63 927 111 2233', dob:'1994-05-28', address:'Bogo City, Cebu',     license:'N01-20-012345', expiry:'2026-04-18', exp:4,  lictype:'Professional',    status:'off-duty',  rating:4.6, trips:176, notes:'Rest day today',                bg:GRADS[4] },
-  { id:12, fname:'Jomar',   lname:'Pascual',    email:'jomar@revv.ph',   phone:'+63 928 222 3344', dob:'1987-10-03', address:'Badian, Cebu',        license:'N01-14-123450', expiry:'2024-03-01', exp:16, lictype:'Professional',    status:'suspended', rating:3.2, trips:708, notes:'Under investigation — multiple complaints', bg:GRADS[5] },
-];
-let nextId = 13;
+let drivers = [];
+let filteredDrivers = [];
 let currentFilter = 'all';
 let currentSearch = '';
 let currentView = 'grid';
+let currentPage = 1;
+const pageSize = 10;
 let editingId = null;
+
+async function loadDrivers() {
+  try {
+    const response = await fetch('/rent/php/driver_action.php?per_page=1000');
+    const json = await response.json();
+    if (!response.ok || !Array.isArray(json.drivers)) {
+      throw new Error(json.error || 'Unable to load drivers.');
+    }
+    drivers = json.drivers.map(driver => ({
+      ...driver,
+      bg: driver.photo ? 'transparent' : (driver.avatar_bg || driver.bg || GRADS[0]),
+    }));
+    updateSummaryCounts();
+    filterDrivers();
+  } catch (error) {
+    showToast(error.message || 'Unable to load drivers.');
+  }
+}
+
+function updateSummaryCounts() {
+  const total = drivers.length;
+  const available = drivers.filter(d => d.status === 'available').length;
+  const onDuty = drivers.filter(d => d.status === 'on-duty').length;
+  const offDuty = drivers.filter(d => d.status === 'off-duty').length;
+  const suspended = drivers.filter(d => d.status === 'suspended').length;
+
+  document.getElementById('totalDriversCount').textContent = total;
+  document.getElementById('availableDriversCount').textContent = available;
+  document.getElementById('onDutyDriversCount').textContent = onDuty;
+  document.getElementById('offDutyDriversCount').textContent = offDuty;
+  document.getElementById('suspendedDriversCount').textContent = suspended;
+}
 
 /* ════ HELPERS ════ */
 function ini(d) { return (d.fname[0]+d.lname[0]).toUpperCase(); }
@@ -64,6 +85,23 @@ function badgeHTML(s) {
   return `<span class="badge ${cls}"><span class="badge-dot"></span>${label}</span>`;
 }
 
+function assetPath(src) {
+  if (!src) return '';
+  if (src.startsWith('/rent/')) return src;
+  if (src.startsWith('/')) return '/rent' + src;
+  return '/rent/' + src;
+}
+
+function showDocumentPreview(src, label) {
+  const previewModal = document.getElementById('docPreviewModal');
+  const previewTitle = document.getElementById('docPreviewTitle');
+  const previewFrame = document.getElementById('docPreviewFrame');
+  if (!previewModal || !previewFrame) return;
+  previewTitle.textContent = label || 'Driver Document';
+  previewFrame.src = src;
+  openModal('docPreviewModal');
+}
+
 function onlineDotColor(s) {
   return s==='available'?'var(--green)':s==='on-duty'?'var(--gold)':s==='suspended'?'#ff6b54':'var(--muted)';
 }
@@ -78,7 +116,9 @@ function renderGrid(data) {
     <div class="driver-card" onclick="viewDriver(${d.id})">
       <div class="dc-header">
         <div class="dc-avatar-wrap">
-          <div class="dc-avatar" style="background:${d.bg}">${ini(d)}<div style="position:absolute;inset:0;background:linear-gradient(135deg,rgba(255,255,255,0.12),transparent 60%)"></div></div>
+          <div class="dc-avatar" style="background:${d.bg};overflow:hidden;position:relative">
+            ${d.photo ? `<img src="${assetPath(d.photo)}" alt="${d.fname} ${d.lname}" style="width:100%;height:100%;object-fit:cover;border-radius:8px">` : `${ini(d)}<div style="position:absolute;inset:0;background:linear-gradient(135deg,rgba(255,255,255,0.12),transparent 60%)"></div>`}
+          </div>
           <div class="dc-online ${d.status==='available'?'active':d.status==='on-duty'?'on-duty':'offline'}" style="background:${onlineDotColor(d.status)}"></div>
         </div>
         ${badgeHTML(d.status)}
@@ -130,16 +170,18 @@ function renderTable(data) {
   const tbody = document.getElementById('tableBody');
   const empty = document.getElementById('emptyTable');
   const tfi = document.getElementById('tfInfo');
-  if(!data.length){ tbody.innerHTML=''; empty.classList.add('show'); tfi.innerHTML='No results'; return; }
+  const total = data.length;
+  const start = (currentPage - 1) * pageSize;
+  const pageItems = data.slice(start, start + pageSize);
+  if(!pageItems.length){ tbody.innerHTML=''; empty.classList.add('show'); tfi.innerHTML='No results'; renderPagination(total); return; }
   empty.classList.remove('show');
-  tfi.innerHTML=`Showing <strong>1–${Math.min(10,data.length)}</strong> of <strong>${data.length}</strong>`;
-  tbody.innerHTML = data.map(d=>`
+  tfi.innerHTML=`Showing <strong>${start+1}–${start+pageItems.length}</strong> of <strong>${total}</strong>`;
+  tbody.innerHTML = pageItems.map(d=>`
     <tr onclick="viewDriver(${d.id})">
       <td>
         <div class="driver-cell">
           <div class="t-avatar" style="background:${d.bg};position:relative;overflow:hidden">
-            ${ini(d)}
-            <div style="position:absolute;inset:0;background:linear-gradient(135deg,rgba(255,255,255,0.12),transparent 60%)"></div>
+            ${d.photo ? `<img src="${assetPath(d.photo)}" alt="${d.fname} ${d.lname}" style="width:100%;height:100%;object-fit:cover;border-radius:4px">` : `${ini(d)}<div style="position:absolute;inset:0;background:linear-gradient(135deg,rgba(255,255,255,0.12),transparent 60%)"></div>`}
           </div>
           <div>
             <div class="t-name">${d.fname} ${d.lname}</div>
@@ -182,15 +224,47 @@ function getFiltered() {
 }
 function filterDrivers() {
   currentSearch = document.getElementById('searchInput').value;
-  const data = getFiltered();
-  document.getElementById('resultsCount').innerHTML=`<strong>${data.length}</strong> driver${data.length!==1?'s':''}`;
-  if(currentView==='grid') renderGrid(data); else renderTable(data);
+  currentPage = 1;
+  applyFilters();
+}
+function applyFilters() {
+  filteredDrivers = getFiltered();
+  document.getElementById('resultsCount').innerHTML=`<strong>${filteredDrivers.length}</strong> driver${filteredDrivers.length!==1?'s':''}`;
+  if(currentView==='grid') {
+    renderGrid(filteredDrivers);
+  } else {
+    renderTable(filteredDrivers);
+  }
 }
 function setFilter(val,btn) {
   currentFilter=val;
   document.querySelectorAll('.ftab').forEach(t=>t.classList.remove('active'));
   btn.classList.add('active');
   filterDrivers();
+}
+
+function renderPagination(total) {
+  const container = document.getElementById('pagination');
+  const pageCount = Math.max(1, Math.ceil(total / pageSize));
+  currentPage = Math.min(currentPage, pageCount);
+
+  const buttons = [];
+  buttons.push(`<button class="pg-btn" ${currentPage===1?'disabled':''} onclick="setPage(${currentPage-1})"><svg width="12" height="12" viewBox="0 0 12 12" fill="none" color="currentColor"><path d="M8 2L4 6l4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></button>`);
+
+  const start = Math.max(1, currentPage - 2);
+  const end = Math.min(pageCount, start + 4);
+  for (let i = start; i <= end; i++) {
+    buttons.push(`<button class="pg-btn ${i===currentPage?'active':''}" onclick="setPage(${i})">${i}</button>`);
+  }
+
+  buttons.push(`<button class="pg-btn" ${currentPage===pageCount?'disabled':''} onclick="setPage(${currentPage+1})"><svg width="12" height="12" viewBox="0 0 12 12" fill="none" color="currentColor"><path d="M4 2l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></button>`);
+  container.innerHTML = buttons.join('');
+}
+
+function setPage(page) {
+  if (page < 1) return;
+  currentPage = page;
+  applyFilters();
 }
 
 /* ════ VIEW TOGGLE ════ */
@@ -211,8 +285,8 @@ function viewDriver(id) {
   document.getElementById('detailEditBtn').onclick = ()=>{ closeModal('detailModal'); openEditModal(id); };
   document.getElementById('detailContent').innerHTML = `
     <div class="detail-hero">
-      <div class="detail-avatar" style="background:${d.bg}">
-        ${ini(d)}
+      <div class="detail-avatar" style="${d.photo ? `background:transparent` : `background:${d.bg}`}">
+        ${d.photo ? `<img src="${assetPath(d.photo)}" alt="${d.fname} ${d.lname}" style="width:100%;height:100%;object-fit:cover;border-radius:8px">` : ini(d)}
         <div class="detail-online" style="background:${onlineDotColor(d.status)}"></div>
       </div>
       <div class="detail-info">
@@ -239,6 +313,7 @@ function viewDriver(id) {
       <div class="detail-row"><span class="detail-key">License Expiry</span><span class="detail-val ${d.expiry&&new Date(d.expiry)<new Date()?'':''}" style="color:${d.expiry&&new Date(d.expiry)<new Date()?'#ff6b54':'var(--white)'}">${d.expiry ? new Date(d.expiry).toLocaleDateString('en-PH',{year:'numeric',month:'long',day:'numeric'}) : '—'}</span></div>
       <div class="detail-row"><span class="detail-key">License Type</span><span class="detail-val">${d.lictype}</span></div>
       ${d.notes?`<div class="detail-row"><span class="detail-key">Notes</span><span class="detail-val" style="max-width:260px;text-align:right;white-space:normal;line-height:1.5;color:var(--muted2)">${d.notes}</span></div>`:''}
+      ${d.documents && d.documents.length ? `<div class="detail-row"><span class="detail-key">Documents</span><span class="detail-val" style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;line-height:1.4;color:var(--muted2)">${d.documents.map(doc=>`<a href="#" onclick="event.preventDefault(); showDocumentPreview('${assetPath(doc.file)}', '${doc.file.split('/').pop().replace(/'/g, "\\'")}');" style="color:var(--white);text-decoration:underline">${doc.file.split('/').pop()}</a>`).join('')}</span></div>` : ''}
     </div>
   `;
   openModal('detailModal');
@@ -250,6 +325,7 @@ function openAddModal() {
   document.getElementById('modalTitle').textContent='Add Driver';
   document.getElementById('saveBtnLabel').textContent='Save Driver';
   ['f-fname','f-lname','f-email','f-phone','f-dob','f-address','f-license','f-expiry','f-exp','f-notes'].forEach(id=>{document.getElementById(id).value='';});
+  ['f-photo','f-document'].forEach(id=>{const el=document.getElementById(id); if(el) el.value='';});
   document.getElementById('f-lictype').selectedIndex=0;
   document.getElementById('f-status').selectedIndex=0;
   selectedBg=GRADS[0];
@@ -275,13 +351,14 @@ function openEditModal(id) {
   document.getElementById('f-lictype').value=d.lictype;
   document.getElementById('f-status').value=d.status;
   document.getElementById('f-notes').value=d.notes;
+  ['f-photo','f-document'].forEach(id=>{const el=document.getElementById(id); if(el) el.value='';});
   selectedBg=d.bg;
   document.getElementById('modalAvatarPreview').style.background=d.bg;
   document.getElementById('avatarInitials').textContent=ini(d);
   document.querySelectorAll('.av-opt').forEach(a=>a.classList.toggle('selected',a.dataset.bg===d.bg));
   openModal('addModal');
 }
-function saveDriver() {
+async function saveDriver() {
   const fname = document.getElementById('f-fname').value.trim();
   const lname = document.getElementById('f-lname').value.trim();
   const email = document.getElementById('f-email').value.trim();
@@ -295,22 +372,106 @@ function saveDriver() {
   const status  = document.getElementById('f-status').value;
   const notes   = document.getElementById('f-notes').value.trim();
   if(!fname||!lname||!license) { showToast('First name, last name, and license are required.'); return; }
-  if(editingId) {
-    const i=drivers.findIndex(d=>d.id===editingId);
-    if(i>-1) drivers[i]={...drivers[i],fname,lname,email,phone,dob,address,license,expiry,exp,lictype,status,notes,bg:selectedBg};
-    showToast(`${fname} ${lname} updated!`,'success');
-  } else {
-    drivers.unshift({id:nextId++,fname,lname,email,phone,dob,address,license,expiry,exp,lictype,status,notes,bg:selectedBg,rating:5.0,trips:0});
-    showToast(`${fname} ${lname} added to fleet!`,'success');
+
+  const payload = {
+    action: editingId ? 'update' : 'create',
+    id: editingId,
+    first_name: fname,
+    last_name: lname,
+    email,
+    phone,
+    dob,
+    address,
+    license_no: license,
+    license_expiry: expiry,
+    experience_years: exp,
+    license_type: lictype,
+    status,
+    notes,
+    avatar_bg: selectedBg,
+  };
+
+  try {
+    const response = await fetch('/rent/php/driver_action.php', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const json = await response.json();
+    if (!response.ok || !json.driver) {
+      throw new Error(json.error || 'Unable to save driver.');
+    }
+
+    let driver = { ...json.driver, bg: json.driver.avatar_bg || selectedBg };
+    const photoFile = document.getElementById('f-photo').files[0];
+    const documentFile = document.getElementById('f-document').files[0];
+    if (photoFile) {
+      driver = await uploadDriverFile('upload_photo', driver.id, 'f-photo');
+    }
+    if (documentFile) {
+      driver = await uploadDriverFile('upload_document', driver.id, 'f-document');
+    }
+
+    if (editingId) {
+      const idx = drivers.findIndex(d => d.id === editingId);
+      if (idx > -1) drivers[idx] = driver;
+      showToast(`${fname} ${lname} updated!`, 'success');
+    } else {
+      drivers.unshift(driver);
+      showToast(`${fname} ${lname} added to fleet!`, 'success');
+    }
+
+    closeModal('addModal');
+    updateSummaryCounts();
+    filterDrivers();
+  } catch (error) {
+    showToast(error.message || 'Unable to save driver.');
   }
-  closeModal('addModal');
-  filterDrivers();
 }
-function deleteDriver(id) {
-  const d=drivers.find(x=>x.id===id);
-  drivers=drivers.filter(x=>x.id!==id);
-  filterDrivers();
-  showToast(`${d.fname} ${d.lname} removed.`,'error');
+
+async function uploadDriverFile(action, id, inputId) {
+  const input = document.getElementById(inputId);
+  if (!input || !input.files.length) return null;
+
+  const form = new FormData();
+  form.append('action', action);
+  form.append('id', id);
+  form.append(inputId === 'f-photo' ? 'photo' : 'document', input.files[0]);
+
+  const response = await fetch('/rent/php/driver_action.php', {
+    method: 'POST',
+    body: form,
+  });
+  const json = await response.json();
+  if (!response.ok || !json.driver) {
+    throw new Error(json.error || 'Unable to upload file.');
+  }
+  return { ...json.driver, bg: json.driver.avatar_bg || selectedBg };
+}
+
+async function deleteDriver(id) {
+  const driver = drivers.find(x => x.id === id);
+  if (!driver) return;
+  if (!confirm(`Delete ${driver.fname} ${driver.lname}? This action cannot be undone.`)) return;
+
+  try {
+    const response = await fetch('/rent/php/driver_action.php', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'delete', id }),
+    });
+    const json = await response.json();
+    if (!response.ok || json.error) {
+      throw new Error(json.error || 'Unable to delete driver.');
+    }
+
+    drivers = drivers.filter(x => x.id !== id);
+    updateSummaryCounts();
+    filterDrivers();
+    showToast(`${driver.fname} ${driver.lname} removed.`, 'error');
+  } catch (error) {
+    showToast(error.message || 'Unable to delete driver.');
+  }
 }
 
 /* ════ EXPORT ════ */
@@ -342,4 +503,28 @@ function showToast(msg,type='error'){
   setTimeout(()=>t.classList.remove('show'),3400);
 }
 
-filterDrivers();
+function setupEventHandlers() {
+  const gridBtn = document.getElementById('gridToggle');
+  const listBtn = document.getElementById('listToggle');
+  const exportBtn = document.getElementById('exportBtn');
+  const addBtn = document.getElementById('addDriverBtn');
+  const searchInput = document.getElementById('searchInput');
+  const expSelect = document.getElementById('expFilter');
+
+  if (gridBtn) gridBtn.addEventListener('click', () => setView('grid'));
+  if (listBtn) listBtn.addEventListener('click', () => setView('list'));
+  if (exportBtn) exportBtn.addEventListener('click', exportCSV);
+  if (addBtn) addBtn.addEventListener('click', openAddModal);
+  if (searchInput) searchInput.addEventListener('input', filterDrivers);
+  if (expSelect) expSelect.addEventListener('change', filterDrivers);
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', () => {
+    setupEventHandlers();
+    loadDrivers();
+  });
+} else {
+  setupEventHandlers();
+  loadDrivers();
+}

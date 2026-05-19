@@ -97,6 +97,22 @@
     setTimeout(() => toast.classList.remove('show'), 3500);
   }
 
+  function applyServerLoginError() {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('error') !== 'invalid') return;
+    if (emailInput) setFieldState('emailGroup', emailInput, false);
+    if (passwordInput) setFieldState('passwordGroup', passwordInput, false);
+
+    const reason = params.get('reason');
+    if (reason === 'notfound') {
+      window.alert('We couldn’t find an account with that email. Please check the email address or sign up.');
+    } else if (reason === 'wrongpass') {
+      window.alert('The password is incorrect. Please try again or reset your password if you need help.');
+    } else {
+      window.alert('Oops! That email/password combination isn’t right. Please try again.');
+    }
+  }
+
   // ── Form submit ──
   const loginForm = document.getElementById('loginForm');
   if (loginForm) {
@@ -123,5 +139,7 @@
       btn.classList.add('loading');
       loginForm.submit();
     });
+
+    applyServerLoginError();
   }
 

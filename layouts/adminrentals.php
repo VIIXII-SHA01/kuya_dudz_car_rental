@@ -1,3 +1,35 @@
+<?php
+$rentalsLoaded = false;
+$rentals = [];
+try {
+    require_once __DIR__ . '/../databases/connection1.php';
+    $stmt = $conn->query('SELECT id, rental_ref, customer_name, customer_ref, vehicle_name, plate_no, vehicle_type, driver_type, status, pickup_date, return_date, days, rate, total, location, notes FROM rentals ORDER BY id DESC');
+    $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    foreach ($rows as $row) {
+        $rentals[] = [
+            'id' => (int) $row['id'],
+            'rentalId' => $row['rental_ref'] ?? '',
+            'customer' => $row['customer_name'] ?? 'Guest Customer',
+            'cusid' => $row['customer_ref'] ?? '',
+            'vehicle' => $row['vehicle_name'] ?? '',
+            'plate' => $row['plate_no'] ?? '',
+            'type' => $row['vehicle_type'] ?? 'Sedan',
+            'driver' => $row['driver_type'] ?? 'Self-drive',
+            'status' => $row['status'] ?? 'reserved',
+            'pickup' => $row['pickup_date'] ?? '',
+            'ret' => $row['return_date'] ?? '',
+            'days' => isset($row['days']) ? (int) $row['days'] : 0,
+            'rate' => isset($row['rate']) ? (float) $row['rate'] : 0.0,
+            'total' => isset($row['total']) ? (float) $row['total'] : 0.0,
+            'location' => $row['location'] ?? '',
+            'notes' => $row['notes'] ?? '',
+        ];
+    }
+    $rentalsLoaded = true;
+} catch (Throwable $e) {
+    // Keep local sample data if database access fails
+}
+?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -77,11 +109,11 @@
 
       <!-- Summary strip -->
       <div class="summary-strip">
-        <div class="sstrip-item"><div class="sstrip-val">16</div><div class="sstrip-lab">Total Rentals</div></div>
-        <div class="sstrip-item"><div class="sstrip-val" style="color:var(--blue)">4</div><div class="sstrip-lab">Ongoing</div></div>
-        <div class="sstrip-item"><div class="sstrip-val" style="color:var(--gold)">3</div><div class="sstrip-lab">Reserved</div></div>
-        <div class="sstrip-item"><div class="sstrip-val" style="color:var(--green)">7</div><div class="sstrip-lab">Completed</div></div>
-        <div class="sstrip-item"><div class="sstrip-val" style="color:var(--red)">2</div><div class="sstrip-lab">Overdue</div></div>
+        <div class="sstrip-item"><div class="sstrip-val" id="summaryTotal">16</div><div class="sstrip-lab">Total Rentals</div></div>
+        <div class="sstrip-item"><div class="sstrip-val" id="summaryOngoing" style="color:var(--blue)">4</div><div class="sstrip-lab">Ongoing</div></div>
+        <div class="sstrip-item"><div class="sstrip-val" id="summaryReserved" style="color:var(--gold)">3</div><div class="sstrip-lab">Reserved</div></div>
+        <div class="sstrip-item"><div class="sstrip-val" id="summaryCompleted" style="color:var(--green)">7</div><div class="sstrip-lab">Completed</div></div>
+        <div class="sstrip-item"><div class="sstrip-val" id="summaryOverdue" style="color:var(--red)">2</div><div class="sstrip-lab">Overdue</div></div>
       </div>
 
       <!-- Filter bar -->
@@ -298,7 +330,10 @@
   <span id="toastMsg"></span>
 </div>
 
-<script src="/rent/javascript/adminrentals.js"></script>
+<script>
+window.serverRentals = <?php echo $rentalsLoaded ? json_encode($rentals, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) : 'undefined'; ?>;
+</script>
+<script src="/rent/javascript/adminrentals.js?v=2"></script>
 <script src="/rent/javascript/admindashboard.js"></script>
 </body>
 </html>

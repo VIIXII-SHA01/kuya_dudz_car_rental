@@ -1,0 +1,59 @@
+:root {
+  --theme-transition: background 0.25s ease, color 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease, fill 0.25s ease, stroke 0.25s ease;
+}
+
+body.light-mode {
+  --black: #F4F6F8;
+  --dark: #FFFFFF;
+  --panel: #F8F9FB;
+  --card: #FFFFFF;
+  --card2: #F2F4F8;
+  --border: rgba(15, 23, 42, 0.08);
+  --border2: rgba(15, 23, 42, 0.12);
+  --red: #E8341A;
+  --red-dim: rgba(232, 52, 26, 0.12);
+  --red-glow: rgba(232, 52, 26, 0.16);
+  --orange: #F5642A;
+  --gold: #BB7C2A;
+  --gold-dim: rgba(212, 168, 67, 0.12);
+  --white: #0F172A;
+  --muted: #52606D;
+  --muted2: #667085;
+  --green: #0F9D58;
+  --green-dim: rgba(15, 157, 88, 0.12);
+  --blue: #1D4ED8;
+  --blue-dim: rgba(59, 113, 246, 0.12);
+  --purple: #6D28D9;
+  --purple-dim: rgba(107, 36, 217, 0.12);
+}
+
+body,
+.sidebar,
+.main,
+.topbar,
+.content,
+.setting-card,
+.form-input,
+.form-select,
+.form-textarea,
+.btn-ghost,
+.icon-btn,
+.toast,
+.theme-toggle {
+  transition: var(--theme-transition);
+}
+
+.theme-toggle {
+  width: 42px;
+  height: 42px;
+  border-radius: 3px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+
+.theme-toggle:focus-visible {
+  outline: 2px solid rgba(232, 52, 26, 0.35);
+  outline-offset: 2px;
+}

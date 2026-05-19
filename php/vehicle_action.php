@@ -10,7 +10,13 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     exit;
 }
 
-$body = json_decode(file_get_contents('php://input'), true) ?? [];
+$contentType = $_SERVER['CONTENT_TYPE'] ?? $_SERVER['HTTP_CONTENT_TYPE'] ?? '';
+if (stripos($contentType, 'application/json') !== false) {
+    $body = json_decode(file_get_contents('php://input'), true) ?? [];
+} else {
+    $body = $_POST;
+}
+
 $action = trim($body['action'] ?? 'create');
 $id = isset($body['id']) ? (int) $body['id'] : null;
 $brand = trim($body['brand'] ?? '');
@@ -26,6 +32,11 @@ $rate = isset($body['rate']) ? floatval($body['rate']) : 0.0;
 $mileage = isset($body['mileage']) ? (int) $body['mileage'] : 0;
 $status = trim($body['status'] ?? 'available');
 $notes = trim($body['notes'] ?? '');
+
+$uploadDir = __DIR__ . '/../uploads/';
+if (!is_dir($uploadDir)) {
+    mkdir($uploadDir, 0755, true);
+}
 
 function formatVehicle(array $row): array {
     return [
@@ -43,7 +54,35 @@ function formatVehicle(array $row): array {
         'mileage' => isset($row['mileage']) ? (int) $row['mileage'] : 0,
         'status' => $row['status'] ?? 'available',
         'notes' => trim($row['remarks'] ?? ''),
+        'photo' => !empty($row['main_photo']) ? '/rent/uploads/' . basename($row['main_photo']) : '',
     ];
+}
+
+function processUploadedPhoto(array $file, string $uploadDir): string {
+    if ($file['error'] !== UPLOAD_ERR_OK) {
+        throw new RuntimeException('Photo upload failed.');
+    }
+    if ($file['size'] > 5 * 1024 * 1024) {
+        throw new RuntimeException('Photo must be 5MB or smaller.');
+    }
+    $allowed = ['image/jpeg' => 'jpg', 'image/jpg' => 'jpg', 'image/png' => 'png'];
+    if (!isset($allowed[$file['type']])) {
+        throw new RuntimeException('Only JPG and PNG images are allowed.');
+    }
+    $ext = $allowed[$file['type']];
+    $baseName = pathinfo($file['name'], PATHINFO_FILENAME);
+    $safeName = preg_replace('/[^A-Za-z0-9_\-]/', '_', $baseName);
+    $filename = sprintf('%s_%s.%s', substr($safeName, 0, 50), bin2hex(random_bytes(5)), $ext);
+    $target = $uploadDir . $filename;
+    if (!move_uploaded_file($file['tmp_name'], $target)) {
+        throw new RuntimeException('Unable to save uploaded photo.');
+    }
+    return $filename;
+}
+
+$photoFilename = '';
+if (!empty($_FILES['photo']) && !empty($_FILES['photo']['name'])) {
+    $photoFilename = processUploadedPhoto($_FILES['photo'], $uploadDir);
 }
 
 try {
@@ -107,6 +146,12 @@ try {
         $updateSets[] = 'mileage = :mileage';
     }
 
+    if ($photoFilename) {
+        $insertFields[] = 'main_photo';
+        $insertValues[':main_photo'] = $photoFilename;
+        $updateSets[] = 'main_photo = :main_photo';
+    }
+
     if ($action === 'create') {
         $maxId = (int) $conn->query('SELECT MAX(id) FROM vehicles')->fetchColumn();
         $vehicleRef = 'VH-' . str_pad($maxId + 1, 4, '0', STR_PAD_LEFT);
@@ -121,6 +166,18 @@ try {
             http_response_code(400);
             echo json_encode(['error' => 'Missing vehicle ID.']);
             exit;
+        }
+
+        if ($photoFilename) {
+            $stmtExisting = $conn->prepare('SELECT main_photo FROM vehicles WHERE id = :id');
+            $stmtExisting->execute([':id' => $id]);
+            $existingPhoto = $stmtExisting->fetchColumn();
+            if ($existingPhoto) {
+                $existingPath = $uploadDir . basename($existingPhoto);
+                if (is_file($existingPath)) {
+                    @unlink($existingPath);
+                }
+            }
         }
 
         $stmt = $conn->prepare('UPDATE vehicles SET ' . implode(', ', $updateSets) . ' WHERE id = :id');
@@ -146,7 +203,7 @@ try {
 
     echo json_encode(['vehicle' => formatVehicle($vehicle)]);
     exit;
-} catch (PDOException $e) {
+} catch (Throwable $e) {
     http_response_code(500);
     echo json_encode(['error' => 'Unable to save vehicle.']);
     exit;

@@ -1,3 +1,4 @@
+const API_ENDPOINT = '/rent/php/payment_action.php';
 const METHOD_GRADS = {
   Cash:          'linear-gradient(135deg,#3DBE7A,#3D8FBE)',
   Card:          'linear-gradient(135deg,#3D8FBE,#9A3DBE)',
@@ -7,29 +8,12 @@ const METHOD_GRADS = {
 };
 
 /* ════ DATA ════ */
-let payments = [
-  { id:1,  payId:'PAY-001', customer:'Maria Santos',     cusid:'CUS-001', rentalId:'RNT-001', date:'2026-03-04', due:5400,  paid:5400,  balance:0,    method:'Cash',          ref:'CASH-001',    status:'paid',     notes:'Paid in full upon return.' },
-  { id:2,  payId:'PAY-002', customer:'Jose Reyes',       cusid:'CUS-002', rentalId:'RNT-002', date:'2026-03-10', due:22500, paid:22500, balance:0,    method:'Bank Transfer', ref:'BT-20260310',  status:'paid',     notes:'Corporate billing — Reyes Logistics.' },
-  { id:3,  payId:'PAY-003', customer:'Ana Cruz',         cusid:'CUS-003', rentalId:'RNT-003', date:'2026-03-10', due:3600,  paid:3600,  balance:0,    method:'GCash',         ref:'GC-2026-0030', status:'paid',     notes:'' },
-  { id:4,  payId:'PAY-004', customer:'Carlos Villanueva',cusid:'CUS-004', rentalId:'RNT-004', date:'2026-04-08', due:30000, paid:15000, balance:15000, method:'Cash',          ref:'CASH-004',    status:'partial',  notes:'Down payment only. Balance upon return.' },
-  { id:5,  payId:'PAY-005', customer:'Liza Bautista',    cusid:'CUS-005', rentalId:'RNT-005', date:'2026-03-17', due:3600,  paid:3600,  balance:0,    method:'Maya',          ref:'MAYA-005',    status:'paid',     notes:'' },
-  { id:6,  payId:'PAY-006', customer:'Marco Garcia',     cusid:'CUS-006', rentalId:'RNT-006', date:'2026-04-09', due:66500, paid:33000, balance:33500, method:'Bank Transfer', ref:'BT-20260409',  status:'partial',  notes:'Partial payment received. Balance on completion.' },
-  { id:7,  payId:'PAY-007', customer:'Grace Torres',     cusid:'CUS-007', rentalId:'RNT-007', date:'2026-03-22', due:3000,  paid:3000,  balance:0,    method:'GCash',         ref:'GC-2026-0070', status:'paid',     notes:'' },
-  { id:8,  payId:'PAY-008', customer:'Ryan Mendoza',     cusid:'CUS-008', rentalId:'RNT-008', date:'2026-04-20', due:3600,  paid:0,     balance:3600,  method:'Cash',          ref:'—',           status:'pending',  notes:'Payment due on pick-up date.' },
-  { id:9,  payId:'PAY-009', customer:'Sofia Navarro',    cusid:'CUS-009', rentalId:'RNT-009', date:'2026-04-10', due:9600,  paid:9600,  balance:0,    method:'GCash',         ref:'GC-2026-0090', status:'paid',     notes:'Weekend renter — settled upfront.' },
-  { id:10, payId:'PAY-010', customer:'Trish Pascual',    cusid:'CUS-010', rentalId:'RNT-010', date:'2026-04-25', due:16500, paid:0,     balance:16500, method:'Card',          ref:'—',           status:'pending',  notes:'Awaiting confirmation.' },
-  { id:11, payId:'PAY-011', customer:'Kevin Aquino',     cusid:'CUS-011', rentalId:'RNT-011', date:'2026-03-30', due:3600,  paid:3600,  balance:0,    method:'Cash',          ref:'CASH-011',    status:'refunded', notes:'Refunded due to cancellation.' },
-  { id:12, payId:'PAY-012', customer:'Maria Santos',     cusid:'CUS-001', rentalId:'RNT-012', date:'2026-04-01', due:20000, paid:5000,  balance:15000, method:'GCash',         ref:'GC-2026-0120', status:'overdue',  notes:'Customer not responding. Overdue since April 5.' },
-  { id:13, payId:'PAY-013', customer:'Jose Reyes',       cusid:'CUS-002', rentalId:'RNT-013', date:'2026-03-17', due:66500, paid:66500, balance:0,    method:'Bank Transfer', ref:'BT-20260317',  status:'paid',     notes:'Business event — settled in full.' },
-  { id:14, payId:'PAY-014', customer:'Marco Garcia',     cusid:'CUS-006', rentalId:'RNT-014', date:'2026-04-30', due:22000, paid:0,     balance:22000, method:'Bank Transfer', ref:'—',           status:'pending',  notes:'Group booking — invoice sent.' },
-  { id:15, payId:'PAY-015', customer:'Sofia Navarro',    cusid:'CUS-009', rentalId:'RNT-015', date:'2026-04-11', due:4500,  paid:4500,  balance:0,    method:'Maya',          ref:'MAYA-015',    status:'paid',     notes:'' },
-  { id:16, payId:'PAY-016', customer:'Jomar Ocampo',     cusid:'CUS-014', rentalId:'RNT-016', date:'2026-03-30', due:16800, paid:0,     balance:16800, method:'Cash',          ref:'—',           status:'overdue',  notes:'Blacklisted. Pending balance. Legal action pending.' },
-];
-let nextId = 17;
+let payments = [];
 let currentFilter = 'all';
 let currentSearch = '';
 let currentView = 'grid';
 let editingId = null;
+let editingRef = null;
 
 /* ════ HELPERS ════ */
 function methodChip(m) {
@@ -60,6 +44,23 @@ function calcBalance() {
   const paid = parseFloat(document.getElementById('f-paid').value)||0;
   const bal  = due - paid;
   document.getElementById('f-balance').value = bal >= 0 ? '₱'+bal.toLocaleString() : '—';
+}
+
+async function loadPayments() {
+  try {
+    const response = await fetch(API_ENDPOINT);
+    const result = await response.json();
+    if (!response.ok || !Array.isArray(result.payments)) {
+      throw new Error(result.error || 'Unable to load payments from the server.');
+    }
+    payments = result.payments;
+  } catch (err) {
+    console.warn('Payment API load failed:', err);
+    payments = [];
+    showToast('Unable to load payments from the server.', 'error');
+  }
+  updateStrip();
+  filterPayments();
 }
 
 function updateStrip() {
@@ -245,6 +246,7 @@ function viewPayment(id) {
 /* ════ ADD / EDIT ════ */
 function openAddModal() {
   editingId=null;
+  editingRef=null;
   document.getElementById('modalTitle').textContent='Record Payment';
   document.getElementById('saveBtnLabel').textContent='Save Payment';
   ['f-customer','f-cusid','f-rentalid','f-ref','f-notes'].forEach(id=>{document.getElementById(id).value='';});
@@ -259,6 +261,7 @@ function openAddModal() {
 function openEditModal(id) {
   const d=payments.find(x=>x.id===id); if(!d) return;
   editingId=id;
+  editingRef=d.payId;
   document.getElementById('modalTitle').textContent=`Edit — ${d.payId}`;
   document.getElementById('saveBtnLabel').textContent='Save Changes';
   document.getElementById('f-customer').value=d.customer;
@@ -274,7 +277,7 @@ function openEditModal(id) {
   document.getElementById('f-notes').value=d.notes;
   openModal('addModal');
 }
-function savePayment() {
+async function savePayment() {
   const customer = document.getElementById('f-customer').value.trim();
   const cusid    = document.getElementById('f-cusid').value.trim();
   const rentalId = document.getElementById('f-rentalid').value.trim();
@@ -287,25 +290,76 @@ function savePayment() {
   const status   = document.getElementById('f-status').value;
   const notes    = document.getElementById('f-notes').value.trim();
   if(!customer||!rentalId||!date) { showToast('Customer, rental ID, and date are required.'); return; }
-  if(editingId) {
-    const i=payments.findIndex(d=>d.id===editingId);
-    if(i>-1) payments[i]={...payments[i],customer,cusid,rentalId,date,due,paid,balance,method,ref,status,notes};
-    showToast(`${payments[payments.findIndex(d=>d.id===editingId)].payId} updated!`,'success');
-  } else {
-    const newId='PAY-'+String(nextId).padStart(3,'0');
-    payments.unshift({id:nextId++,payId:newId,customer,cusid,rentalId,date,due,paid,balance,method,ref,status,notes});
-    showToast(`${newId} recorded!`,'success');
+
+  const action = editingRef ? 'update' : 'create';
+  const payload = {
+    action,
+    payment_ref: editingRef,
+    customer,
+    cusid,
+    rentalId,
+    date,
+    due,
+    paid,
+    method,
+    ref,
+    status,
+    notes,
+  };
+
+  try {
+    const response = await fetch(API_ENDPOINT, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const result = await response.json();
+    if (!response.ok || result.error) {
+      showToast(result.error || 'Unable to save payment.','error');
+      return;
+    }
+
+    if (editingId && editingRef) {
+      const index = payments.findIndex(d => d.id === editingId);
+      if (index > -1) payments[index] = result.payment;
+      showToast(`${result.payment.payId} updated!`,'success');
+    } else {
+      payments.unshift(result.payment);
+      showToast(`${result.payment.payId} recorded!`,'success');
+    }
+
+    closeModal('addModal');
+    updateStrip();
+    filterPayments();
+  } catch (err) {
+    console.error(err);
+    showToast('Unable to save payment. Please try again.','error');
   }
-  closeModal('addModal');
-  updateStrip();
-  filterPayments();
 }
-function deletePayment(id) {
-  const d=payments.find(x=>x.id===id);
-  payments=payments.filter(x=>x.id!==id);
-  updateStrip();
-  filterPayments();
-  showToast(`${d.payId} removed.`,'error');
+async function deletePayment(id) {
+  const d = payments.find(x=>x.id===id);
+  if (!d) return;
+
+  try {
+    const response = await fetch(API_ENDPOINT, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'delete', payment_ref: d.payId }),
+    });
+    const result = await response.json();
+    if (!response.ok || result.error) {
+      showToast(result.error || 'Unable to remove payment.','error');
+      return;
+    }
+
+    payments = payments.filter(x => x.id !== id);
+    updateStrip();
+    filterPayments();
+    showToast(`${d.payId} removed.`,'error');
+  } catch (err) {
+    console.error(err);
+    showToast('Unable to remove payment. Please try again.','error');
+  }
 }
 
 /* ════ EXPORT ════ */
@@ -337,5 +391,4 @@ function showToast(msg,type='error'){
   setTimeout(()=>t.classList.remove('show'),3400);
 }
 
-updateStrip();
-filterPayments();
+loadPayments();

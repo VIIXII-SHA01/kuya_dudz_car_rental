@@ -10,25 +10,8 @@ const TYPE_ICONS = {
 };
 
 /* ════ DATA ════ */
-let rentals = [
-  { id:1,  rentalId:'RNT-001', customer:'Maria Santos',    cusid:'CUS-001', vehicle:'Toyota Vios',     plate:'AAA 1234', type:'Sedan',    driver:'Self-drive',  status:'completed', pickup:'2026-03-01', ret:'2026-03-04', days:3, rate:1800, total:5400,  location:'Cebu City Office', notes:'Returned on time. No damage.' },
-  { id:2,  rentalId:'RNT-002', customer:'Jose Reyes',      cusid:'CUS-002', vehicle:'Ford Everest',    plate:'BBB 2345', type:'SUV',      driver:'With Driver', status:'completed', pickup:'2026-03-05', ret:'2026-03-10', days:5, rate:4500, total:22500, location:'Mactan Airport',   notes:'Corporate trip — Reyes Logistics.' },
-  { id:3,  rentalId:'RNT-003', customer:'Ana Cruz',        cusid:'CUS-003', vehicle:'Toyota Vios',     plate:'CCC 3456', type:'Sedan',    driver:'Self-drive',  status:'completed', pickup:'2026-03-08', ret:'2026-03-10', days:2, rate:1800, total:3600,  location:'Cebu City Office', notes:'' },
-  { id:4,  rentalId:'RNT-004', customer:'Carlos Villanueva',cusid:'CUS-004',vehicle:'Toyota Fortuner', plate:'DDD 4567', type:'SUV',      driver:'Self-drive',  status:'ongoing',   pickup:'2026-04-08', ret:'2026-04-14', days:6, rate:5000, total:30000, location:'Talisay Branch',   notes:'Family trip — booked SUV.' },
-  { id:5,  rentalId:'RNT-005', customer:'Liza Bautista',   cusid:'CUS-005', vehicle:'Honda City',      plate:'EEE 5678', type:'Sedan',    driver:'Self-drive',  status:'completed', pickup:'2026-03-15', ret:'2026-03-17', days:2, rate:1800, total:3600,  location:'Cebu City Office', notes:'' },
-  { id:6,  rentalId:'RNT-006', customer:'Marco Garcia',    cusid:'CUS-006', vehicle:'Mercedes GLE',    plate:'FFF 6789', type:'SUV',      driver:'With Driver', status:'ongoing',   pickup:'2026-04-09', ret:'2026-04-16', days:7, rate:9500, total:66500, location:'Mactan Airport',   notes:'High-value client. Premium vehicle requested.' },
-  { id:7,  rentalId:'RNT-007', customer:'Grace Torres',    cusid:'CUS-007', vehicle:'Mitsubishi Mirage',plate:'GGG 7890',type:'Hatchback', driver:'Self-drive', status:'completed', pickup:'2026-03-20', ret:'2026-03-22', days:2, rate:1500, total:3000,  location:'Cebu City Office', notes:'' },
-  { id:8,  rentalId:'RNT-008', customer:'Ryan Mendoza',    cusid:'CUS-008', vehicle:'Toyota Vios',     plate:'HHH 8901', type:'Sedan',    driver:'Self-drive',  status:'reserved',  pickup:'2026-04-20', ret:'2026-04-22', days:2, rate:1800, total:3600,  location:'Cebu City Office', notes:'First rental.' },
-  { id:9,  rentalId:'RNT-009', customer:'Sofia Navarro',   cusid:'CUS-009', vehicle:'Honda BR-V',      plate:'III 9012', type:'SUV',      driver:'Self-drive',  status:'ongoing',   pickup:'2026-04-10', ret:'2026-04-13', days:3, rate:3200, total:9600,  location:'Talisay Branch',   notes:'Weekend renter.' },
-  { id:10, rentalId:'RNT-010', customer:'Trish Pascual',   cusid:'CUS-010', vehicle:'Toyota HiAce',    plate:'JJJ 0123', type:'Van',      driver:'With Driver', status:'reserved',  pickup:'2026-04-25', ret:'2026-04-28', days:3, rate:5500, total:16500, location:'Mactan Airport',   notes:'Group travel.' },
-  { id:11, rentalId:'RNT-011', customer:'Kevin Aquino',    cusid:'CUS-011', vehicle:'Honda City',      plate:'KKK 1122', type:'Sedan',    driver:'Self-drive',  status:'cancelled', pickup:'2026-03-28', ret:'2026-03-30', days:2, rate:1800, total:3600,  location:'Cebu City Office', notes:'Cancelled by customer.' },
-  { id:12, rentalId:'RNT-012', customer:'Maria Santos',    cusid:'CUS-001', vehicle:'Toyota Fortuner', plate:'LLL 2233', type:'SUV',      driver:'Self-drive',  status:'overdue',   pickup:'2026-04-01', ret:'2026-04-05', days:4, rate:5000, total:20000, location:'Cebu City Office', notes:'Customer not responding. Due April 5.' },
-  { id:13, rentalId:'RNT-013', customer:'Jose Reyes',      cusid:'CUS-002', vehicle:'Mercedes GLE',    plate:'MMM 3344', type:'SUV',      driver:'With Driver', status:'completed', pickup:'2026-03-10', ret:'2026-03-17', days:7, rate:9500, total:66500, location:'Mactan Airport',   notes:'Business event.' },
-  { id:14, rentalId:'RNT-014', customer:'Marco Garcia',    cusid:'CUS-006', vehicle:'Toyota HiAce',    plate:'NNN 4455', type:'Van',      driver:'With Driver', status:'reserved',  pickup:'2026-04-30', ret:'2026-05-04', days:4, rate:5500, total:22000, location:'Mactan Airport',   notes:'Group booking.' },
-  { id:15, rentalId:'RNT-015', customer:'Sofia Navarro',   cusid:'CUS-009', vehicle:'Mitsubishi Mirage',plate:'OOO 5566',type:'Hatchback', driver:'Self-drive', status:'ongoing',   pickup:'2026-04-11', ret:'2026-04-14', days:3, rate:1500, total:4500,  location:'Talisay Branch',   notes:'' },
-  { id:16, rentalId:'RNT-016', customer:'Jomar Ocampo',    cusid:'CUS-014', vehicle:'Ford Ranger',     plate:'PPP 6677', type:'Pickup',   driver:'Self-drive',  status:'overdue',   pickup:'2026-03-30', ret:'2026-04-03', days:4, rate:4200, total:16800, location:'Cebu City Office', notes:'Blacklisted customer. Pending balance.' },
-];
-let nextId = 17;
+let rentals = Array.isArray(window.serverRentals) ? window.serverRentals : [];
+let nextId = Array.isArray(window.serverRentals) ? null : 1;
 let currentFilter = 'all';
 let currentSearch = '';
 let currentView = 'grid';
@@ -186,12 +169,35 @@ function filterRentals() {
   const data = getFiltered();
   document.getElementById('resultsCount').innerHTML=`<strong>${data.length}</strong> rental${data.length!==1?'s':''}`;
   if(currentView==='grid') renderGrid(data); else renderTable(data);
+  updateSummaryCounts();
 }
 function setFilter(val,btn) {
   currentFilter=val;
   document.querySelectorAll('.ftab').forEach(t=>t.classList.remove('active'));
   btn.classList.add('active');
   filterRentals();
+}
+
+function updateSummaryCounts() {
+  const counts = rentals.reduce((acc, d) => {
+    acc.total += 1;
+    if (typeof d.status === 'string' && Object.prototype.hasOwnProperty.call(acc, d.status)) {
+      acc[d.status] += 1;
+    }
+    return acc;
+  }, { total: 0, ongoing: 0, reserved: 0, completed: 0, overdue: 0 });
+
+  const totalEl = document.getElementById('summaryTotal');
+  const ongoingEl = document.getElementById('summaryOngoing');
+  const reservedEl = document.getElementById('summaryReserved');
+  const completedEl = document.getElementById('summaryCompleted');
+  const overdueEl = document.getElementById('summaryOverdue');
+
+  if (totalEl) totalEl.textContent = counts.total;
+  if (ongoingEl) ongoingEl.textContent = counts.ongoing;
+  if (reservedEl) reservedEl.textContent = counts.reserved;
+  if (completedEl) completedEl.textContent = counts.completed;
+  if (overdueEl) overdueEl.textContent = counts.overdue;
 }
 
 /* ════ VIEW TOGGLE ════ */
@@ -280,7 +286,7 @@ function openEditModal(id) {
   document.getElementById('f-notes').value=d.notes;
   openModal('addModal');
 }
-function saveRental() {
+async function saveRental() {
   const customer = document.getElementById('f-customer').value.trim();
   const cusid    = document.getElementById('f-cusid').value.trim();
   const vehicle  = document.getElementById('f-vehicle').value.trim();
@@ -295,24 +301,103 @@ function saveRental() {
   const days     = parseInt(document.getElementById('f-days').value)||0;
   const total    = rate * days;
   const notes    = document.getElementById('f-notes').value.trim();
+
   if(!customer||!vehicle||!pickup) { showToast('Customer, vehicle, and pick-up date are required.'); return; }
-  if(editingId) {
-    const i=rentals.findIndex(d=>d.id===editingId);
-    if(i>-1) rentals[i]={...rentals[i],customer,cusid,vehicle,plate,type,driver,status,pickup,ret,location,rate,days,total,notes};
-    showToast(`${rentals[rentals.findIndex(d=>d.id===editingId)].rentalId} updated!`,'success');
-  } else {
-    const newId = 'RNT-'+String(nextId).padStart(3,'0');
-    rentals.unshift({id:nextId++,rentalId:newId,customer,cusid,vehicle,plate,type,driver,status,pickup,ret,location,rate,days,total,notes});
-    showToast(`${newId} created!`,'success');
+
+  const rentalData = {
+    customer,
+    cusid,
+    vehicle,
+    plate,
+    type,
+    driver,
+    status,
+    pickup,
+    ret,
+    location,
+    rate,
+    days,
+    total,
+    notes,
+  };
+  const payload = {
+    action: editingId ? 'update' : 'create',
+    id: editingId,
+    ...rentalData,
+  };
+
+  if (!hasServer) {
+    if(editingId) {
+      const i = rentals.findIndex(d => d.id === editingId);
+      if (i > -1) rentals[i] = { ...rentals[i], ...rentalData };
+      showToast(`${rentals[rentals.findIndex(d=>d.id===editingId)].rentalId} updated!`, 'success');
+    } else {
+      const newId = 'RNT-'+String(nextId).padStart(3,'0');
+      rentals.unshift({ id: nextId++, rentalId: newId, ...rentalData });
+      showToast(`${newId} created!`, 'success');
+    }
+    closeModal('addModal');
+    filterRentals();
+    return;
   }
-  closeModal('addModal');
-  filterRentals();
+
+  try {
+    const response = await fetch('/rent/php/rental_action.php', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const data = await response.json();
+    if (!response.ok || data.error) {
+      showToast(data.error || 'Unable to save rental.', 'error');
+      return;
+    }
+
+    if (editingId) {
+      rentals = rentals.map(d => d.id === editingId ? data.rental : d);
+      showToast(`${data.rental.rentalId} updated!`, 'success');
+    } else {
+      rentals.unshift(data.rental);
+      showToast(`${data.rental.rentalId} created!`, 'success');
+    }
+
+    closeModal('addModal');
+    filterRentals();
+  } catch (err) {
+    showToast('Unable to save rental. Please try again.', 'error');
+  }
 }
-function deleteRental(id) {
-  const d=rentals.find(x=>x.id===id);
-  rentals=rentals.filter(x=>x.id!==id);
-  filterRentals();
-  showToast(`${d.rentalId} removed.`,'error');
+
+async function deleteRental(id) {
+  const d = rentals.find(x => x.id === id);
+  if (!d) return;
+  const hasServer = Array.isArray(window.serverRentals);
+  if (!hasServer) {
+    rentals = rentals.filter(x => x.id !== id);
+    filterRentals();
+    showToast(`${d.rentalId} removed.`, 'error');
+    return;
+  }
+
+  if (!window.confirm(`Delete ${d.rentalId}?`)) return;
+
+  try {
+    const response = await fetch('/rent/php/rental_action.php', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'delete', id })
+    });
+    const data = await response.json();
+    if (!response.ok || data.error) {
+      showToast(data.error || 'Unable to delete rental.', 'error');
+      return;
+    }
+    rentals = rentals.filter(x => x.id !== id);
+    filterRentals();
+    showToast(`${d.rentalId} removed.`, 'error');
+  } catch (err) {
+    showToast('Unable to delete rental. Please try again.', 'error');
+  }
 }
 
 /* ════ EXPORT ════ */

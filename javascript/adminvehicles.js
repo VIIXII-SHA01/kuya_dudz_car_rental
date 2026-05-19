@@ -62,9 +62,10 @@ function renderGrid(data) {
       <div class="vc-image-wrap">
         <div class="vc-image-bg"></div>
         <div class="vc-image-grid"></div>
+        ${v.photo ? `<img src="${v.photo}" alt="${v.brand} ${v.model}" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:0;" onerror="this.style.display='none'" />` : ''}
         <div class="vc-year-badge">${v.year}</div>
         <div class="vc-status-badge">${badgeHTML(v.status)}</div>
-        <div class="vc-car-svg">${carSVG(v.status)}</div>
+        ${v.photo ? '' : `<div class="vc-car-svg">${carSVG(v.status)}</div>`}
       </div>
       <div class="vc-body">
         <div class="vc-make">${v.brand}</div>
@@ -126,7 +127,7 @@ function renderTableView(data) {
   tfi.innerHTML = `Showing <strong>1–${Math.min(10,data.length)}</strong> of <strong>${data.length}</strong>`;
   tbody.innerHTML = data.map(v => `
     <tr onclick="viewVehicle(${v.id})">
-      <td><div class="car-thumb">${carSVG(v.status,50,30)}</div></td>
+      <td><div class="car-thumb">${v.photo ? `<img src="${v.photo}" alt="${v.brand} ${v.model}" style="width:100%;height:100%;object-fit:cover;border-radius:3px" onerror="this.style.display='none'">` : carSVG(v.status,50,30)}</div></td>
       <td>
         <div class="car-name">${v.brand} ${v.model}</div>
         <div class="car-make">${v.type} · ${v.year}</div>
@@ -211,7 +212,9 @@ function viewVehicle(id) {
   document.getElementById('detailEditBtn').onclick = () => { closeModal('detailModal'); openEditModal(id); };
   document.getElementById('detailContent').innerHTML = `
     <div class="detail-hero">
-      <div class="detail-car-wrap">${carSVG(v.status, 110, 54)}</div>
+      <div class="detail-car-wrap">
+        ${v.photo ? `<img src="${v.photo}" alt="${v.brand} ${v.model}" style="width:100%;height:100%;object-fit:cover;border-radius:8px;display:block;" onerror="this.style.display='none'" />` : carSVG(v.status, 110, 54)}
+      </div>
       <div class="detail-info">
         <div class="detail-make">${v.brand} · ${v.year}</div>
         <div class="detail-model">${v.model}</div>
@@ -256,6 +259,10 @@ function openAddModal() {
     const el = document.getElementById(id);
     if (el.tagName==='SELECT') el.selectedIndex=0; else el.value='';
   });
+  document.getElementById('f-photo').value = '';
+  document.getElementById('photoFilename').textContent = '';
+  document.getElementById('photoPreview').src = '';
+  document.getElementById('photoPreviewWrap').style.display = 'none';
   openModal('addModal');
 }
 
@@ -278,7 +285,31 @@ function openEditModal(id) {
   document.getElementById('f-mileage').value = v.mileage;
   document.getElementById('f-status').value  = v.status;
   document.getElementById('f-notes').value   = v.notes;
+  document.getElementById('f-photo').value = '';
+  document.getElementById('photoFilename').textContent = v.photo ? 'Current photo already uploaded' : '';
+  if (v.photo) {
+    document.getElementById('photoPreview').src = v.photo;
+    document.getElementById('photoPreviewWrap').style.display = 'block';
+  } else {
+    document.getElementById('photoPreview').src = '';
+    document.getElementById('photoPreviewWrap').style.display = 'none';
+  }
   openModal('addModal');
+}
+
+function handlePhotoChange(event) {
+  const file = event.target.files[0];
+  const preview = document.getElementById('photoPreview');
+  const previewWrap = document.getElementById('photoPreviewWrap');
+  if (file) {
+    document.getElementById('photoFilename').textContent = file.name;
+    preview.src = URL.createObjectURL(file);
+    previewWrap.style.display = 'block';
+  } else {
+    document.getElementById('photoFilename').textContent = '';
+    preview.src = '';
+    previewWrap.style.display = 'none';
+  }
 }
 
 function saveVehicle() {
@@ -305,6 +336,8 @@ function saveVehicle() {
     id: editingId,
     brand, model, year, color, type, plate, seats, fuel, trans, rate, mileage, status, notes
   };
+  const photoInput = document.getElementById('f-photo');
+  const photoFile = photoInput.files[0];
 
   const hasServer = Array.isArray(window.serverVehicles);
   if (!hasServer) {
@@ -321,10 +354,17 @@ function saveVehicle() {
     return;
   }
 
+  const formData = new FormData();
+  Object.entries(payload).forEach(([key, value]) => {
+    if (value !== undefined && value !== null) formData.append(key, value);
+  });
+  if (photoFile) {
+    formData.append('photo', photoFile);
+  }
+
   fetch('/rent/php/vehicle_action.php', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload)
+    body: formData
   })
     .then(r => r.json().then(data => ({ ok: r.ok, data })))
     .then(({ ok, data }) => {

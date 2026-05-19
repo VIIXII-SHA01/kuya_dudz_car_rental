@@ -21,13 +21,13 @@ try {
     $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
     if (! $user) {
-        header('Location: /rent/login?error=invalid');
+        header('Location: /rent/login?error=invalid&reason=notfound');
         exit;
     }
 
     $passwordValid = password_verify($password, $user['password']) || $password === $user['password'];
     if (! $passwordValid) {
-        header('Location: /rent/login?error=invalid');
+        header('Location: /rent/login?error=invalid&reason=wrongpass');
         exit;
     }
 
