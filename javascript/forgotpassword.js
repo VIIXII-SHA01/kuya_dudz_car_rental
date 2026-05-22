@@ -36,11 +36,11 @@ function showToast(msg, type = 'error') {
   const tm = document.getElementById('toastMsg');
   const ti = document.getElementById('toastIcon');
   tm.textContent = msg;
-  t.className = 'toast' + (type === 'success' ? ' success' : '');
-  const c = type === 'success' ? '#3DBE7A' : '#E8341A';
+  t.className = 'toast' + (type === 'success' ? ' success' : type === 'info' ? ' info' : ' error');
+  const c = type === 'success' ? '#3DBE7A' : type === 'info' ? '#3D8FBE' : '#E8341A';
   ti.innerHTML = type === 'success'
     ? `<circle cx="7.5" cy="7.5" r="6" stroke="${c}" stroke-width="1.3"/><path d="M5 7.5l2 2 3.5-3.5" stroke="${c}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>`
-    : `<circle cx="7.5" cy="7.5" r="6" stroke="${c}" stroke-width="1.3"/><path d="M7.5 5v3" stroke="${c}" stroke-width="1.5" stroke-linecap="round"/><circle cx="7.5" cy="10" r="0.7" fill="${c}"/>`;
+    : `<circle cx="7.5" cy="5" r="2.2" stroke="${c}" stroke-width="1.3"/><path d="M4 12c0-1.7 1.8-3 3.5-3s3.5 1.3 3.5 3" stroke="${c}" stroke-width="1.3" stroke-linecap="round"/>`;
   void t.offsetWidth;
   t.classList.add('show');
   setTimeout(() => t.classList.remove('show'), 3600);
@@ -50,6 +50,7 @@ function showToast(msg, type = 'error') {
    STAGE NAVIGATION
 ════════════════════════════════ */
 let userEmail = '';
+let resetToken = null;
 let timerInterval = null;
 
 function goStage(n) {
@@ -67,6 +68,27 @@ function updateDots(active) {
     if (i < active)  dot.classList.add('done');
     else if (i === active) dot.classList.add('active');
     else dot.classList.add('idle');
+  });
+}
+
+function buildApiUrl(path) {
+  const origin = window.location.origin;
+  const pathname = window.location.pathname.replace(/\/$/, '');
+  const base = pathname.replace(/\/[^\/]+$/, '/');
+  return new URL(path, origin + base).href;
+}
+
+function fetchJson(url, options) {
+  return fetch(url, options).then(async r => {
+    const text = await r.text();
+    if (!r.ok) {
+      throw new Error(text || `Server error ${r.status}`);
+    }
+    try {
+      return JSON.parse(text);
+    } catch {
+      throw new Error('Invalid JSON response from server.');
+    }
   });
 }
 
@@ -91,16 +113,28 @@ function sendCode() {
   userEmail = email.value.trim();
   btn.classList.add('loading');
 
-  setTimeout(() => {
+  const url = buildApiUrl('php/forgot_action.php');
+  fetchJson(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ email: userEmail })
+  }).then(res => {
     btn.classList.remove('loading');
-    document.getElementById('sentToEmail').textContent = maskEmail(userEmail);
-    document.getElementById('emailDisplay').textContent = maskEmail(userEmail);
-    goStage(2);
-    startTimer(300); // 5 minutes
-    showToast('Code sent! Check your inbox.', 'success');
-    // Auto-focus first OTP input
-    setTimeout(() => document.querySelector('.otp-input').focus(), 300);
-  }, 1800);
+    if (res.success) {
+      document.getElementById('sentToEmail').textContent = maskEmail(userEmail);
+      document.getElementById('emailDisplay').textContent = maskEmail(userEmail);
+      goStage(2);
+      startTimer(300); // 5 minutes
+      showToast('Code sent! Check your inbox.', 'success');
+      setTimeout(() => document.querySelector('.otp-input').focus(), 300);
+    } else {
+      showToast(res.message || 'Failed to send code.');
+    }
+  }).catch(err => {
+    btn.classList.remove('loading');
+    console.error('Forgot password sendCode failed:', err, url);
+    showToast(err.message || 'Network error sending code.');
+  });
 }
 
 function maskEmail(email) {
@@ -225,7 +259,6 @@ function getOTPValue() {
 function verifyOTP() {
   const otp = getOTPValue();
   const btn = document.getElementById('verifyBtn');
-
   if (otp.length < 6) {
     otpInputs.forEach(i => { if (!i.value) i.classList.add('invalid'); });
     showToast('Please enter all 6 digits.');
@@ -233,14 +266,26 @@ function verifyOTP() {
   }
 
   btn.classList.add('loading');
-
-  setTimeout(() => {
+  const url = buildApiUrl('php/verify_otp.php');
+  fetchJson(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ email: userEmail, code: otp })
+  }).then(res => {
     btn.classList.remove('loading');
-    clearInterval(timerInterval);
-    // For demo purposes, any 6-digit code works
-    goStage(3);
-    showToast('Identity verified! Set your new password.', 'success');
-  }, 1600);
+    if (res.success && res.token) {
+      clearInterval(timerInterval);
+      resetToken = res.token;
+      goStage(3);
+      showToast('Identity verified! Set your new password.', 'success');
+    } else {
+      showToast(res.message || 'Invalid code.');
+    }
+  }).catch(err => {
+    btn.classList.remove('loading');
+    console.error('Forgot password verifyOTP failed:', err, url);
+    showToast(err.message || 'Network error verifying code.');
+  });
 }
 
 /* ════════════════════════════════
@@ -313,17 +358,31 @@ function resetPassword() {
   }
 
   if (!ok) { showToast('Please fix the errors above.'); return; }
+  if (!resetToken) { showToast('Session expired. Please request a new code.'); return; }
 
   btn.classList.add('loading');
-  setTimeout(() => {
+  const url = buildApiUrl('php/reset_action.php');
+  fetchJson(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ token: resetToken, password: np.value })
+  }).then(res => {
     btn.classList.remove('loading');
-    // Hide all stages, show success
-    document.querySelectorAll('.stage').forEach(s => s.style.display = 'none');
-    document.getElementById('stepDots').style.display = 'none';
-    document.querySelector('.back-link').style.display = 'none';
-    document.getElementById('successBox').classList.add('show');
-    showToast('Password reset successfully!', 'success');
-  }, 2000);
+    if (res.success) {
+      // Hide all stages, show success
+      document.querySelectorAll('.stage').forEach(s => s.style.display = 'none');
+      document.getElementById('stepDots').style.display = 'none';
+      document.querySelector('.back-link').style.display = 'none';
+      document.getElementById('successBox').classList.add('show');
+      showToast('Password reset successfully!', 'success');
+    } else {
+      showToast(res.message || 'Failed to reset password.');
+    }
+  }).catch(err => {
+    btn.classList.remove('loading');
+    console.error('Forgot password resetPassword failed:', err, url);
+    showToast(err.message || 'Network error resetting password.');
+  });
 }
 
 /* ════════════════════════════════

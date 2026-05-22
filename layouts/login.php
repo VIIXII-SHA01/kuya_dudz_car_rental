@@ -1,9 +1,10 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+<?php include __DIR__ . '/../includes/favicon.php'; ?>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>REVV — Sign In</title>
+<title>KDCR — Sign In</title>
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow:ital,wght@0,300;0,400;0,500;0,600;1,300&family=Barlow+Condensed:wght@500;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/rent/css/login.css">
 </head>
@@ -26,7 +27,7 @@
           <circle cx="11.5" cy="9.5" r="1.8" fill="white"/>
         </svg>
       </div>
-      <span class="logo-text">REVV</span>
+      <span class="logo-text">KDCR</span>
     </a>
 
     <!-- Decorative gauge -->
@@ -172,7 +173,7 @@
         <div class="logo-mark">
           <svg width="14" height="10" viewBox="0 0 16 12" fill="none"><path d="M1 9L4 3h8l3 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="4.5" cy="9.5" r="1.8" fill="currentColor"/><circle cx="11.5" cy="9.5" r="1.8" fill="currentColor"/></svg>
         </div>
-        <span class="logo-text">REVV</span>
+        <span class="logo-text">KDCR</span>
       </div>
 
       <div class="form-eyebrow">Welcome back</div>
@@ -198,7 +199,7 @@
         <div class="field-group" id="passwordGroup">
           <div class="field-label">
             Password
-            <a href="#">Forgot password?</a>
+            <a href="/rent/forgotpassword">Forgot password?</a>
           </div>
           <div class="input-wrap">
             <svg class="input-icon" width="18" height="18" viewBox="0 0 18 18" fill="none">

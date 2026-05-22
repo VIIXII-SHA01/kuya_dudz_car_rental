@@ -1,6 +1,10 @@
 RewriteEngine On
 RewriteBase /rent/
 Options -Indexes
+DirectoryIndex index.php
+
+# Browser default favicon request → KDCR logo
+RewriteRule ^favicon\.ico$ kdcr.png [L]
 
 # Redirect legacy direct layout URLs to clean routes
 RewriteRule ^layouts/admindashboard\.php$ /rent/dashboard [R=301,L]
@@ -14,15 +18,15 @@ RewriteRule ^layouts/adminsettings\.php$ /rent/settings [R=301,L]
 RewriteRule ^layouts/login\.php$ /rent/login [R=301,L]
 RewriteRule ^layouts/signup\.php$ /rent/signup [R=301,L]
 
-# Block direct access to internal server-side folders that should only be included via PHP
-RewriteRule ^(layouts|navs|databases)/ - [F,L]
+# Block direct access to internal server-side folders
+RewriteRule ^(layouts|navs|databases|includes)/ - [F,L]
 
 # Serve real files and directories normally
 RewriteCond %{REQUEST_FILENAME} -f [OR]
 RewriteCond %{REQUEST_FILENAME} -d
 RewriteRule ^ - [L]
 
-# Send clean route requests to the front controller
-RewriteRule ^(login|register|dashboard|bookings|vehicles|drivers|customers|payments|reports|settings)/?$ php/mainscript.php [L,QSA]
-RewriteRule ^$ php/mainscript.php [L,QSA]
-RewriteRule ^.*$ php/mainscript.php [L,QSA]
+# Clean URLs → front controller at rent root (works better on InfinityFree)
+RewriteRule ^(login|register|forgotpassword|logout|dashboard|bookings|vehicles|drivers|customers|payments|reports|profile|users|settings)/?$ index.php [L,QSA]
+RewriteRule ^$ index.php [L,QSA]
+RewriteRule ^.*$ index.php [L,QSA]

@@ -1,5 +1,22 @@
 /* ════ DATA ════ */
-let vehicles = window.serverVehicles || [
+function normalizeVehicle(v) {
+  return {
+    ...v,
+    id: Number(v.id),
+    mileage: v.mileage != null ? Number(v.mileage) : 0,
+    seats: v.seats != null ? Number(v.seats) : 0,
+    fuel: v.fuel || '',
+    trans: v.trans || '',
+    brand: v.brand || '',
+    model: v.model || '',
+    plate: v.plate || '',
+    type: v.type || '',
+  };
+}
+
+let vehicles = Array.isArray(window.serverVehicles)
+  ? window.serverVehicles.map(normalizeVehicle)
+  : [
   { id:1, brand:'Toyota',     model:'Vios 1.3L',    year:2023, color:'Pearl White',    type:'Sedan',    plate:'ABC-1234', seats:5, fuel:'Gasoline', trans:'Automatic', rate:800,  mileage:12400, status:'available',   notes:'' },
   { id:2, brand:'Honda',      model:'City RS',       year:2022, color:'Lunar Silver',   type:'Sedan',    plate:'XYZ-5678', seats:5, fuel:'Gasoline', trans:'Automatic', rate:900,  mileage:23100, status:'rented',      notes:'' },
   { id:3, brand:'Mitsubishi', model:'Mirage G4',     year:2021, color:'Jet Black',      type:'Sedan',    plate:'DEF-9012', seats:5, fuel:'Gasoline', trans:'Automatic', rate:750,  mileage:31500, status:'available',   notes:'' },
@@ -58,7 +75,7 @@ function renderGrid(data) {
   if (!data.length) { grid.innerHTML=''; empty.classList.add('show'); return; }
   empty.classList.remove('show');
   grid.innerHTML = data.map(v => `
-    <div class="vehicle-card" onclick="viewVehicle(${v.id})">
+    <div class="vehicle-card" data-id="${v.id}">
       <div class="vc-image-wrap">
         <div class="vc-image-bg"></div>
         <div class="vc-image-grid"></div>
@@ -99,15 +116,15 @@ function renderGrid(data) {
           </span>
         </div>
         <div class="vc-actions">
-          <button class="vc-btn view" onclick="viewVehicle(${v.id});event.stopPropagation()">
+          <button type="button" class="vc-btn view" data-action="view" data-id="${v.id}">
             <svg width="13" height="13" viewBox="0 0 13 13" fill="none" color="currentColor"><path d="M1 6.5s2.5-4 5.5-4 5.5 4 5.5 4-2.5 4-5.5 4-5.5-4-5.5-4z" stroke="currentColor" stroke-width="1.2"/><circle cx="6.5" cy="6.5" r="1.5" stroke="currentColor" stroke-width="1.2"/></svg>
             View
           </button>
-          <button class="vc-btn edit" onclick="openEditModal(${v.id});event.stopPropagation()">
+          <button type="button" class="vc-btn edit" data-action="edit" data-id="${v.id}">
             <svg width="13" height="13" viewBox="0 0 13 13" fill="none" color="currentColor"><path d="M2 9.5L9.5 2l1.5 1.5-7.5 7.5H2V9.5z" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
             Edit
           </button>
-          <button class="vc-btn del" onclick="deleteVehicle(${v.id});event.stopPropagation()">
+          <button type="button" class="vc-btn del" data-action="delete" data-id="${v.id}">
             <svg width="13" height="13" viewBox="0 0 13 13" fill="none" color="currentColor"><path d="M2 3.5h9M5 3.5V2h3v1.5M10 3.5l-.7 7.5H3.7L3 3.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
             Delete
           </button>
@@ -115,6 +132,7 @@ function renderGrid(data) {
       </div>
     </div>
   `).join('');
+  bindVehicleActions();
 }
 
 /* ════ RENDER TABLE ════ */
@@ -126,7 +144,7 @@ function renderTableView(data) {
   empty.classList.remove('show');
   tfi.innerHTML = `Showing <strong>1–${Math.min(10,data.length)}</strong> of <strong>${data.length}</strong>`;
   tbody.innerHTML = data.map(v => `
-    <tr onclick="viewVehicle(${v.id})">
+    <tr class="vehicle-row" data-id="${v.id}">
       <td><div class="car-thumb">${v.photo ? `<img src="${v.photo}" alt="${v.brand} ${v.model}" style="width:100%;height:100%;object-fit:cover;border-radius:3px" onerror="this.style.display='none'">` : carSVG(v.status,50,30)}</div></td>
       <td>
         <div class="car-name">${v.brand} ${v.model}</div>
@@ -141,13 +159,54 @@ function renderTableView(data) {
       <td>${badgeHTML(v.status)}</td>
       <td>
         <div style="display:flex;align-items:center;gap:6px;justify-content:center">
-          <div class="act-btn view" title="View" onclick="viewVehicle(${v.id});event.stopPropagation()"><svg width="13" height="13" viewBox="0 0 13 13" fill="none" color="currentColor"><path d="M1 6.5s2.5-4 5.5-4 5.5 4 5.5 4-2.5 4-5.5 4-5.5-4-5.5-4z" stroke="currentColor" stroke-width="1.2"/><circle cx="6.5" cy="6.5" r="1.5" stroke="currentColor" stroke-width="1.2"/></svg></div>
-          <div class="act-btn edit" title="Edit" onclick="openEditModal(${v.id});event.stopPropagation()"><svg width="13" height="13" viewBox="0 0 13 13" fill="none" color="currentColor"><path d="M2 9.5L9.5 2l1.5 1.5-7.5 7.5H2V9.5z" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
-          <div class="act-btn del" title="Delete" onclick="deleteVehicle(${v.id});event.stopPropagation()"><svg width="13" height="13" viewBox="0 0 13 13" fill="none" color="currentColor"><path d="M2 3.5h9M5 3.5V2h3v1.5M10 3.5l-.7 7.5H3.7L3 3.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          <button type="button" class="act-btn view" title="View" data-action="view" data-id="${v.id}"><svg width="13" height="13" viewBox="0 0 13 13" fill="none" color="currentColor"><path d="M1 6.5s2.5-4 5.5-4 5.5 4 5.5 4-2.5 4-5.5 4-5.5-4-5.5-4z" stroke="currentColor" stroke-width="1.2"/><circle cx="6.5" cy="6.5" r="1.5" stroke="currentColor" stroke-width="1.2"/></svg></button>
+          <button type="button" class="act-btn edit" title="Edit" data-action="edit" data-id="${v.id}"><svg width="13" height="13" viewBox="0 0 13 13" fill="none" color="currentColor"><path d="M2 9.5L9.5 2l1.5 1.5-7.5 7.5H2V9.5z" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+          <button type="button" class="act-btn del" title="Delete" data-action="delete" data-id="${v.id}"><svg width="13" height="13" viewBox="0 0 13 13" fill="none" color="currentColor"><path d="M2 3.5h9M5 3.5V2h3v1.5M10 3.5l-.7 7.5H3.7L3 3.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
         </div>
       </td>
     </tr>
   `).join('');
+  bindVehicleActions();
+}
+
+let vehicleActionsBound = false;
+function bindVehicleActions() {
+  if (vehicleActionsBound) return;
+  vehicleActionsBound = true;
+
+  document.getElementById('gridView')?.addEventListener('click', handleVehicleGridClick);
+  document.getElementById('tableBody')?.addEventListener('click', handleVehicleTableClick);
+}
+
+function handleVehicleGridClick(event) {
+  const actionBtn = event.target.closest('[data-action]');
+  if (actionBtn) {
+    event.stopPropagation();
+    handleVehicleActionButton(actionBtn);
+    return;
+  }
+  const card = event.target.closest('.vehicle-card');
+  if (card?.dataset.id) viewVehicle(Number(card.dataset.id));
+}
+
+function handleVehicleTableClick(event) {
+  const actionBtn = event.target.closest('[data-action]');
+  if (actionBtn) {
+    event.stopPropagation();
+    handleVehicleActionButton(actionBtn);
+    return;
+  }
+  const row = event.target.closest('.vehicle-row');
+  if (row?.dataset.id) viewVehicle(Number(row.dataset.id));
+}
+
+function handleVehicleActionButton(button) {
+  const id = Number(button.dataset.id);
+  const action = button.dataset.action;
+  if (!id) return;
+  if (action === 'view') viewVehicle(id);
+  if (action === 'edit') openEditModal(id);
+  if (action === 'delete') deleteVehicle(id);
 }
 
 /* ════ FILTER + SEARCH ════ */
@@ -159,7 +218,7 @@ function getFiltered() {
     const matchStatus = currentFilter === 'all' || v.status === currentFilter;
     const matchType   = !typeVal  || v.type  === typeVal;
     const matchBrand  = !brandVal || v.brand === brandVal;
-    const matchSearch = !q || v.model.toLowerCase().includes(q) || v.brand.toLowerCase().includes(q) || v.plate.toLowerCase().includes(q) || v.type.toLowerCase().includes(q);
+    const matchSearch = !q || [v.model, v.brand, v.plate, v.type].some(field => String(field || '').toLowerCase().includes(q));
     return matchStatus && matchType && matchBrand && matchSearch;
   });
 }
@@ -206,7 +265,7 @@ function setView(v) {
 
 /* ════ VIEW DETAIL ════ */
 function viewVehicle(id) {
-  const v = vehicles.find(x => x.id === id);
+  const v = vehicles.find(x => Number(x.id) === Number(id));
   if (!v) return;
   document.getElementById('detailTitle').textContent = `${v.brand} ${v.model}`;
   document.getElementById('detailEditBtn').onclick = () => { closeModal('detailModal'); openEditModal(id); };
@@ -230,7 +289,7 @@ function viewVehicle(id) {
         <div class="detail-stat-lab">Daily Rate</div>
       </div>
       <div class="detail-stat">
-        <div class="detail-stat-val" style="color:var(--muted2)">${v.mileage.toLocaleString()}</div>
+        <div class="detail-stat-val" style="color:var(--muted2)">${(v.mileage ?? 0).toLocaleString()}</div>
         <div class="detail-stat-lab">Mileage (km)</div>
       </div>
       <div class="detail-stat">
@@ -278,11 +337,11 @@ function openEditModal(id) {
   document.getElementById('f-color').value   = v.color;
   document.getElementById('f-type').value    = v.type;
   document.getElementById('f-plate').value   = v.plate;
-  document.getElementById('f-seats').value   = v.seats;
-  document.getElementById('f-fuel').value    = v.fuel;
-  document.getElementById('f-trans').value   = v.trans;
+  document.getElementById('f-seats').value   = v.seats ?? '';
+  document.getElementById('f-fuel').value    = v.fuel ?? '';
+  document.getElementById('f-trans').value   = v.trans ?? '';
   document.getElementById('f-rate').value    = v.rate;
-  document.getElementById('f-mileage').value = v.mileage;
+  document.getElementById('f-mileage').value = v.mileage ?? '';
   document.getElementById('f-status').value  = v.status;
   document.getElementById('f-notes').value   = v.notes;
   document.getElementById('f-photo').value = '';
@@ -315,27 +374,32 @@ function handlePhotoChange(event) {
 function saveVehicle() {
   const brand   = document.getElementById('f-brand').value;
   const model   = document.getElementById('f-model').value.trim();
-  const year    = parseInt(document.getElementById('f-year').value);
+  const year    = parseInt(document.getElementById('f-year').value, 10);
   const color   = document.getElementById('f-color').value.trim();
   const type    = document.getElementById('f-type').value;
   const plate   = document.getElementById('f-plate').value.trim();
-  const seats   = parseInt(document.getElementById('f-seats').value);
+  const seatsRaw = document.getElementById('f-seats').value.trim();
+  const seats   = seatsRaw !== '' ? parseInt(seatsRaw, 10) : undefined;
   const fuel    = document.getElementById('f-fuel').value;
   const trans   = document.getElementById('f-trans').value;
-  const rate    = parseFloat(document.getElementById('f-rate').value);
-  const mileage = parseInt(document.getElementById('f-mileage').value) || 0;
+  const rateRaw = document.getElementById('f-rate').value;
+  const rate    = rateRaw !== '' ? parseFloat(rateRaw) : null;
+  const mileage = parseInt(document.getElementById('f-mileage').value, 10) || 0;
   const status  = document.getElementById('f-status').value;
   const notes   = document.getElementById('f-notes').value.trim();
 
-  if (!brand || !model || !year || !type || !plate || !seats || !rate) {
+  if (!brand || !model || !year || !type || !plate || rate === null || Number.isNaN(rate) || rate <= 0) {
     showToast('Please fill in all required fields.'); return;
   }
 
   const payload = {
     action: editingId ? 'update' : 'create',
     id: editingId,
-    brand, model, year, color, type, plate, seats, fuel, trans, rate, mileage, status, notes
+    brand, model, year, color, type, plate, fuel, trans, rate, mileage, status, notes
   };
+  if (seats !== undefined && !Number.isNaN(seats)) {
+    payload.seats = seats;
+  }
   const photoInput = document.getElementById('f-photo');
   const photoFile = photoInput.files[0];
 
@@ -372,11 +436,12 @@ function saveVehicle() {
         showToast(data.error || 'Unable to save vehicle.', 'error');
         return;
       }
+      const saved = normalizeVehicle(data.vehicle);
       if (editingId) {
-        vehicles = vehicles.map(v => v.id === editingId ? data.vehicle : v);
+        vehicles = vehicles.map(v => v.id === editingId ? saved : v);
         showToast(`${brand} ${model} updated!`, 'success');
       } else {
-        vehicles.unshift(data.vehicle);
+        vehicles.unshift(saved);
         showToast(`${brand} ${model} added to fleet!`, 'success');
       }
       closeModal('addModal');
@@ -422,8 +487,8 @@ function exportCSV() {
   const rows = vehicles.map(v => [v.id, v.brand, v.model, v.year, v.color, v.type, v.plate, v.seats, v.fuel, v.trans, v.rate, v.mileage, v.status]);
   const csv = [headers, ...rows].map(r => r.join(',')).join('\n');
   const blob = new Blob([csv], {type:'text/csv'});
-  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'REVV_Vehicles.csv'; a.click();
-  showToast('Exported as REVV_Vehicles.csv', 'success');
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'KDCR_Vehicles.csv'; a.click();
+  showToast('Exported as KDCR_Vehicles.csv', 'success');
 }
 
 /* ════ MODAL HELPERS ════ */
@@ -446,4 +511,5 @@ function showToast(msg, type='error') {
 }
 
 // Init
+bindVehicleActions();
 filterVehicles();

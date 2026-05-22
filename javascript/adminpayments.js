@@ -34,6 +34,21 @@ function badgeHTML(s) {
 }
 
 function fmtMoney(n) { return '₱'+Number(n).toLocaleString(); }
+function canDeletePayment(d) {
+  return d.can_delete === true || d.status === 'paid' || d.status === 'refunded';
+}
+function paymentDeleteButtonHtml(d) {
+  if (!canDeletePayment(d)) {
+    return '<button class="pc-act-btn del disabled" title="Only paid or refunded payments can be deleted" disabled style="opacity:0.35;cursor:not-allowed"><svg width="13" height="13" viewBox="0 0 13 13" fill="none" color="currentColor"><path d="M2 3.5h9M5 3.5V2h3v1.5M10 3.5l-.7 7.5H3.7L3 3.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>Remove</button>';
+  }
+  return `<button class="pc-act-btn del" onclick="deletePayment(${d.id});event.stopPropagation()"><svg width="13" height="13" viewBox="0 0 13 13" fill="none" color="currentColor"><path d="M2 3.5h9M5 3.5V2h3v1.5M10 3.5l-.7 7.5H3.7L3 3.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>Remove</button>`;
+}
+function paymentTableDeleteHtml(d) {
+  if (!canDeletePayment(d)) {
+    return '<div class="act-btn del disabled" title="Only paid or refunded payments can be deleted" style="opacity:0.35;cursor:not-allowed;pointer-events:none"><svg width="13" height="13" viewBox="0 0 13 13" fill="none" color="currentColor"><path d="M2 3.5h9M5 3.5V2h3v1.5M10 3.5l-.7 7.5H3.7L3 3.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>';
+  }
+  return `<div class="act-btn del" onclick="deletePayment(${d.id});event.stopPropagation()" title="Remove"><svg width="13" height="13" viewBox="0 0 13 13" fill="none" color="currentColor"><path d="M2 3.5h9M5 3.5V2h3v1.5M10 3.5l-.7 7.5H3.7L3 3.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>`;
+}
 function fmtDate(str) {
   if(!str||str==='—') return '—';
   return new Date(str).toLocaleDateString('en-PH',{year:'numeric',month:'short',day:'numeric'});
@@ -46,9 +61,112 @@ function calcBalance() {
   document.getElementById('f-balance').value = bal >= 0 ? '₱'+bal.toLocaleString() : '—';
 }
 
+const CUSTOMER_SUGGEST_API = '/rent/php/payment_action.php?action=suggest';
+const customerNameInput = document.getElementById('f-customer');
+const customerIdInput = document.getElementById('f-cusid');
+const rentalIdInput = document.getElementById('f-rentalid');
+const referenceInput = document.getElementById('f-ref');
+const customerSuggestionsContainer = document.getElementById('customerSuggestions');
+let customerSuggestionTimer = null;
+
+function generateReferenceNo() {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let result = 'REF-';
+  for (let i = 0; i < 8; i += 1) {
+    result += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return `${result}-${Date.now().toString().slice(-4)}`;
+}
+
+function renderCustomerSuggestions(suggestions) {
+  customerSuggestionsContainer.innerHTML = '';
+
+  if (!suggestions.length) {
+    customerSuggestionsContainer.innerHTML = '<div class="autocomplete-empty">No matching bookings found.</div>';
+    customerSuggestionsContainer.style.display = 'block';
+    return;
+  }
+
+  suggestions.forEach(item => {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'autocomplete-suggestion';
+    button.dataset.name = item.customer_name || '';
+    button.dataset.ref = item.customer_ref || '';
+    button.dataset.booking = item.booking_ref || '';
+    button.dataset.amount = item.total_due || '';
+
+    const nameLabel = document.createElement('div');
+    nameLabel.className = 'suggestion-name';
+    nameLabel.textContent = item.customer_name || item.customer_ref || 'Unknown';
+
+    const subLabel = document.createElement('div');
+    subLabel.className = 'suggestion-sub';
+    const amount = item.total_due !== undefined && item.total_due !== null && item.total_due !== ''
+      ? ` · Due ₱${Number(item.total_due).toLocaleString()}`
+      : '';
+    subLabel.textContent = `Booking: ${item.booking_ref || 'Unknown'}${amount}`;
+
+    button.appendChild(nameLabel);
+    button.appendChild(subLabel);
+    button.addEventListener('click', () => selectCustomerSuggestion(button));
+    customerSuggestionsContainer.appendChild(button);
+  });
+
+  customerSuggestionsContainer.style.display = 'block';
+}
+
+function hideCustomerSuggestions() {
+  customerSuggestionsContainer.style.display = 'none';
+}
+
+function selectCustomerSuggestion(button) {
+  customerNameInput.value = button.dataset.name;
+  customerIdInput.value = button.dataset.ref;
+  rentalIdInput.value = button.dataset.booking;
+  document.getElementById('f-due').value = button.dataset.amount || '';
+  calcBalance();
+  hideCustomerSuggestions();
+}
+
+function scheduleCustomerSuggestions(query) {
+  if (customerSuggestionTimer) {
+    clearTimeout(customerSuggestionTimer);
+  }
+  customerSuggestionTimer = window.setTimeout(() => fetchCustomerSuggestions(query), 180);
+}
+
+async function fetchCustomerSuggestions(query = '') {
+  try {
+    const url = `${CUSTOMER_SUGGEST_API}&q=${encodeURIComponent(query || '')}`;
+    const response = await fetch(url, { credentials: 'same-origin' });
+    if (!response.ok) throw new Error('Suggestion fetch failed');
+    const data = await response.json();
+    renderCustomerSuggestions(Array.isArray(data.suggestions) ? data.suggestions : []);
+  } catch (error) {
+    customerSuggestionsContainer.innerHTML = '<div class="autocomplete-empty">Unable to load suggestions.</div>';
+    customerSuggestionsContainer.style.display = 'block';
+  }
+}
+
+document.addEventListener('click', (event) => {
+  if (!customerSuggestionsContainer.contains(event.target) && event.target !== customerNameInput) {
+    hideCustomerSuggestions();
+  }
+});
+
+document.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape') {
+    hideCustomerSuggestions();
+  }
+});
+
+customerNameInput.addEventListener('input', () => scheduleCustomerSuggestions(customerNameInput.value));
+customerNameInput.addEventListener('focus', () => scheduleCustomerSuggestions(customerNameInput.value));
+
 async function loadPayments() {
   try {
-    const response = await fetch(API_ENDPOINT);
+    const response = await fetch(API_ENDPOINT, { credentials: 'same-origin' });
     const result = await response.json();
     if (!response.ok || !Array.isArray(result.payments)) {
       throw new Error(result.error || 'Unable to load payments from the server.');
@@ -118,10 +236,7 @@ function renderGrid(data) {
           <svg width="13" height="13" viewBox="0 0 13 13" fill="none" color="currentColor"><path d="M2 9.5L9.5 2l1.5 1.5-7.5 7.5H2V9.5z" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
           Edit
         </button>
-        <button class="pc-act-btn del" onclick="deletePayment(${d.id});event.stopPropagation()">
-          <svg width="13" height="13" viewBox="0 0 13 13" fill="none" color="currentColor"><path d="M2 3.5h9M5 3.5V2h3v1.5M10 3.5l-.7 7.5H3.7L3 3.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          Remove
-        </button>
+        ${paymentDeleteButtonHtml(d)}
       </div>
     </div>
   `).join('');
@@ -163,7 +278,7 @@ function renderTable(data) {
         <div style="display:flex;align-items:center;gap:6px;justify-content:center">
           <div class="act-btn view" onclick="viewPayment(${d.id});event.stopPropagation()" title="View"><svg width="13" height="13" viewBox="0 0 13 13" fill="none" color="currentColor"><path d="M1 6.5s2.5-4 5.5-4 5.5 4 5.5 4-2.5 4-5.5 4-5.5-4-5.5-4z" stroke="currentColor" stroke-width="1.2"/><circle cx="6.5" cy="6.5" r="1.5" stroke="currentColor" stroke-width="1.2"/></svg></div>
           <div class="act-btn edit" onclick="openEditModal(${d.id});event.stopPropagation()" title="Edit"><svg width="13" height="13" viewBox="0 0 13 13" fill="none" color="currentColor"><path d="M2 9.5L9.5 2l1.5 1.5-7.5 7.5H2V9.5z" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
-          <div class="act-btn del" onclick="deletePayment(${d.id});event.stopPropagation()" title="Remove"><svg width="13" height="13" viewBox="0 0 13 13" fill="none" color="currentColor"><path d="M2 3.5h9M5 3.5V2h3v1.5M10 3.5l-.7 7.5H3.7L3 3.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          ${paymentTableDeleteHtml(d)}
         </div>
       </td>
     </tr>
@@ -249,13 +364,15 @@ function openAddModal() {
   editingRef=null;
   document.getElementById('modalTitle').textContent='Record Payment';
   document.getElementById('saveBtnLabel').textContent='Save Payment';
-  ['f-customer','f-cusid','f-rentalid','f-ref','f-notes'].forEach(id=>{document.getElementById(id).value='';});
+  ['f-customer','f-cusid','f-rentalid','f-notes'].forEach(id=>{document.getElementById(id).value='';});
+  document.getElementById('f-ref').value = generateReferenceNo();
   document.getElementById('f-due').value='';
   document.getElementById('f-paid').value='';
   document.getElementById('f-balance').value='';
   document.getElementById('f-date').value='';
   document.getElementById('f-method').selectedIndex=0;
   document.getElementById('f-status').selectedIndex=0;
+  hideCustomerSuggestions();
   openModal('addModal');
 }
 function openEditModal(id) {
@@ -339,6 +456,10 @@ async function savePayment() {
 async function deletePayment(id) {
   const d = payments.find(x=>x.id===id);
   if (!d) return;
+  if (!canDeletePayment(d)) {
+    showToast('Only paid or refunded payments can be deleted.','error');
+    return;
+  }
 
   try {
     const response = await fetch(API_ENDPOINT, {
@@ -368,8 +489,8 @@ function exportCSV() {
   const r=payments.map(d=>[d.payId,d.customer,d.cusid,d.rentalId,d.date,d.method,d.ref,d.due,d.paid,d.balance,d.status,d.notes]);
   const csv=[h,...r].map(row=>row.join(',')).join('\n');
   const blob=new Blob([csv],{type:'text/csv'});
-  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='REVV_Payments.csv';a.click();
-  showToast('Exported as REVV_Payments.csv','success');
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='KDCR_Payments.csv';a.click();
+  showToast('Exported as KDCR_Payments.csv','success');
 }
 
 /* ════ MODAL ════ */

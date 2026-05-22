@@ -13,11 +13,11 @@ let reportStats = {
 };
 let currentKpis = {
   revenue: 0,
-  rentals: 0,
+  bookings: 0,
   avg: 0,
   overdue: 0,
   revenueDelta: '',
-  rentalsDelta: '',
+  bookingsDelta: '',
   avgDelta: '',
   overdueDelta: '',
 };
@@ -39,7 +39,7 @@ async function loadReport() {
 
     currentKpis = {
       revenue: result.kpis.revenue || 0,
-      rentals: result.kpis.rentals || 0,
+      bookings: result.kpis.bookings ?? result.kpis.rentals ?? 0,
       avg: result.kpis.avg || 0,
       overdue: result.kpis.overdue || 0,
     };
@@ -71,11 +71,11 @@ async function loadReport() {
 
 function updateKpis() {
   document.getElementById('kpi-revenue').textContent = '₱' + Number(currentKpis.revenue).toLocaleString();
-  document.getElementById('kpi-rentals').textContent = Number(currentKpis.rentals).toLocaleString();
+  document.getElementById('kpi-bookings').textContent = Number(currentKpis.bookings).toLocaleString();
   document.getElementById('kpi-avg').textContent = '₱' + Number(currentKpis.avg).toLocaleString();
   document.getElementById('kpi-overdue').textContent = '₱' + Number(currentKpis.overdue).toLocaleString();
   document.getElementById('kpi-revenue-delta').textContent = currentKpis.revenueDelta;
-  document.getElementById('kpi-rentals-delta').textContent = currentKpis.rentalsDelta;
+  document.getElementById('kpi-bookings-delta').textContent = currentKpis.bookingsDelta;
   document.getElementById('kpi-avg-delta').textContent = currentKpis.avgDelta;
   document.getElementById('kpi-overdue-delta').textContent = currentKpis.overdueDelta;
 }
@@ -104,7 +104,7 @@ function renderRevenueChart() {
         <div class="bar-month">${m.month}</div>
         <div class="bar-track">
           <div class="bar-fill" style="width:${pct}%;background:${fillColor};animation:growBar 0.8s ease forwards">
-            <span class="bar-amount">${m.rentals} rentals</span>
+            <span class="bar-amount">${m.bookings ?? m.rentals ?? 0} bookings</span>
           </div>
         </div>
         <div class="bar-val">₱${(m.revenue / 1000).toFixed(0)}k</div>
@@ -166,7 +166,7 @@ function renderDonut() {
   sublabel.setAttribute('font-size', '9');
   sublabel.setAttribute('fill', '#6A6E75');
   sublabel.setAttribute('letter-spacing', '2');
-  sublabel.textContent = 'RENTALS';
+  sublabel.textContent = 'BOOKINGS';
   svgEl.appendChild(sublabel);
 
   document.getElementById('donutLegend').innerHTML = fleetMix.map(d => `
@@ -209,7 +209,7 @@ function renderTopVehicles() {
 function renderStatusGrid() {
   const grid = document.getElementById('statusGrid');
   if (!statusData.length) {
-    grid.innerHTML = '<div class="status-empty">No rental status data available.</div>';
+    grid.innerHTML = '<div class="status-empty">No booking status data available.</div>';
     return;
   }
 
@@ -248,8 +248,201 @@ function setPeriod(p, btn) {
 }
 
 /* ════ EXPORT / PRINT ════ */
-function exportReport() { showToast('Exporting report as PDF…'); }
-function printReport()  { window.print(); }
+function getActivePeriodLabel() {
+  const active = document.querySelector('.ptab.active');
+  return active ? active.textContent.trim() : 'Report';
+}
+
+function getJsPDFConstructor() {
+  const lib = window.jspdf;
+  if (!lib) return null;
+  return lib.jsPDF || lib.default || null;
+}
+
+function pdfFmtMoney(amount) {
+  return 'PHP ' + Number(amount || 0).toLocaleString('en-US');
+}
+
+function triggerPdfDownload(doc, filename) {
+  const blob = doc.output('blob');
+  if (!blob || blob.size < 100) {
+    throw new Error('Generated PDF was empty');
+  }
+
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  link.setAttribute('download', filename);
+  link.style.cssText = 'position:fixed;left:-9999px;top:0;visibility:hidden;';
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+
+  setTimeout(() => URL.revokeObjectURL(url), 5000);
+}
+
+function buildReportPdfDocument(JsPDF) {
+  const periodRange = document.getElementById('periodRange')?.textContent?.trim() || '';
+  const periodTab = getActivePeriodLabel();
+  const generated = new Date().toLocaleString();
+  const margin = 14;
+  const doc = new JsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait' });
+  let y = 18;
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(18);
+  doc.setTextColor(232, 52, 26);
+  doc.text('KDCR - Business Report', margin, y);
+  y += 8;
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(10);
+  doc.setTextColor(68, 68, 68);
+  doc.text(`${periodTab} - ${periodRange}`, margin, y);
+  y += 5;
+  doc.setFontSize(9);
+  doc.setTextColor(102, 102, 102);
+  doc.text(`Generated ${generated}`, margin, y);
+  y += 8;
+
+  const sections = [
+    {
+      title: 'Key Performance Indicators',
+      head: [['KPI', 'Value']],
+      body: [
+        ['Total Revenue', pdfFmtMoney(currentKpis.revenue)],
+        ['Total Bookings', String(Number(currentKpis.bookings).toLocaleString('en-US'))],
+        ['Avg Booking Value', pdfFmtMoney(currentKpis.avg)],
+        ['Overdue / Unpaid', pdfFmtMoney(currentKpis.overdue)],
+      ],
+      empty: ['—', 'No KPI data'],
+    },
+    {
+      title: 'Revenue by Month',
+      head: [['Month', 'Bookings', 'Revenue']],
+      body: monthData.map(m => [m.month, String(m.bookings ?? m.rentals ?? 0), pdfFmtMoney(m.revenue)]),
+      empty: ['—', '—', 'No revenue data'],
+    },
+    {
+      title: 'Fleet Mix',
+      head: [['Type', 'Bookings', 'Share']],
+      body: fleetMix.map(d => {
+        const pct = totalMix > 0 ? Math.round(d.count / totalMix * 100) : 0;
+        return [d.type, String(d.count), `${pct}%`];
+      }),
+      empty: ['—', '—', 'No fleet mix data'],
+    },
+    {
+      title: 'Top Vehicles',
+      head: [['#', 'Vehicle', 'Revenue']],
+      body: topVehicles.map((v, i) => [
+        String(i + 1),
+        `${v.name} (${v.plate})`,
+        pdfFmtMoney(v.revenue),
+      ]),
+      empty: ['—', 'No vehicle data', '—'],
+    },
+    {
+      title: 'Booking Status',
+      head: [['Status', 'Count']],
+      body: statusData.map(s => [s.label, String(s.val)]),
+      empty: ['—', 'No status data'],
+    },
+    {
+      title: 'Key Insights',
+      head: [['Insight']],
+      body: insights.map(i => [`${i.title}: ${i.desc}`]),
+      empty: ['No insights available'],
+    },
+  ];
+
+  if (typeof doc.autoTable === 'function') {
+    const tableBase = {
+      theme: 'grid',
+      styles: { fontSize: 9, cellPadding: 2.5, overflow: 'linebreak' },
+      headStyles: { fillColor: [243, 243, 243], textColor: [17, 17, 17], fontStyle: 'bold' },
+      margin: { left: margin, right: margin },
+    };
+
+    sections.forEach(section => {
+      const pageH = doc.internal.pageSize.getHeight();
+      if (y > pageH - 40) {
+        doc.addPage();
+        y = 16;
+      }
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(11);
+      doc.setTextColor(17, 17, 17);
+      doc.text(section.title, margin, y);
+      y += 5;
+      doc.autoTable({
+        ...tableBase,
+        head: section.head,
+        body: section.body.length ? section.body : [section.empty],
+        startY: y,
+      });
+      y = doc.lastAutoTable.finalY + 10;
+    });
+  } else {
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(10);
+    doc.setTextColor(17, 17, 17);
+    sections.forEach(section => {
+      const pageH = doc.internal.pageSize.getHeight();
+      if (y > pageH - 20) {
+        doc.addPage();
+        y = 16;
+      }
+      doc.setFont('helvetica', 'bold');
+      doc.text(section.title, margin, y);
+      y += 6;
+      doc.setFont('helvetica', 'normal');
+      const rows = section.body.length ? section.body : [section.empty];
+      rows.forEach(row => {
+        if (y > pageH - 12) {
+          doc.addPage();
+          y = 16;
+        }
+        doc.text(row.join('  |  '), margin, y, { maxWidth: 180 });
+        y += 6;
+      });
+      y += 4;
+    });
+  }
+
+  return doc;
+}
+
+function exportReport() {
+  const JsPDF = getJsPDFConstructor();
+  if (!JsPDF) {
+    showToast('PDF library failed to load. Refresh the page and try again.');
+    return;
+  }
+
+  const btn = document.getElementById('exportPdfBtn');
+  if (btn) btn.disabled = true;
+
+  const filename = `KDCR_Report_${new Date().toISOString().slice(0, 10)}.pdf`;
+
+  try {
+    const doc = buildReportPdfDocument(JsPDF);
+    triggerPdfDownload(doc, filename);
+    showToast('Downloaded ' + filename);
+  } catch (err) {
+    console.error('PDF export failed:', err);
+    showToast('PDF export failed. Try Print Report or refresh the page.');
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
+window.exportReport = exportReport;
+
+function printReport() {
+  window.print();
+}
 
 /* ════ TOAST ════ */
 function showToast(msg) {

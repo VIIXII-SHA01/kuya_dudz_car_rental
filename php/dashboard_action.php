@@ -1,6 +1,7 @@
 <?php
 session_start();
 require_once __DIR__ . '/../databases/connection1.php';
+require_once __DIR__ . '/db_helpers.php';
 
 header('Content-Type: application/json');
 
@@ -44,6 +45,8 @@ function formatCurrency(float $value): string {
 }
 
 try {
+    reconcileAllOpenBookingsOverdue($conn);
+
     $currentYear = (int) date('Y');
     $currentMonth = (int) date('m');
     $previousYear = $currentYear - 1;
@@ -178,7 +181,21 @@ try {
         ];
     }, $stmt->fetchAll(PDO::FETCH_ASSOC));
 
+    $sessionUser = $_SESSION['user'] ?? null;
+    $userFullName = 'Valued User';
+    if (is_array($sessionUser)) {
+        $first = trim((string) ($sessionUser['first_name'] ?? ''));
+        $last = trim((string) ($sessionUser['last_name'] ?? ''));
+        $userFullName = trim(($first ? $first . ' ' : '') . $last) ?: 'Valued User';
+    }
+
     sendJson([
+        'user' => [
+            'first_name' => $sessionUser['first_name'] ?? '',
+            'last_name' => $sessionUser['last_name'] ?? '',
+            'full_name' => $userFullName,
+            'role' => $sessionUser['role'] ?? 'Administrator',
+        ],
         'stats' => [
             'totalCars' => $totalCars,
             'availableCars' => $availableCars,

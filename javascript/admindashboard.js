@@ -43,11 +43,34 @@ const sidebar  = document.getElementById('sidebar');
   });
 
   const DASHBOARD_API = '/rent/php/dashboard_action.php';
+  const USER_API = '/rent/php/user_action.php';
   const dashboardBase = document.getElementById('statTotalCars');
+  let dashboardUser = {};
+  let dashboardHeaderTimer = null;
 
   if (dashboardBase) {
     loadDashboard();
     initRevenueToggle();
+  } else {
+    loadUserHeader();
+  }
+
+  async function loadUserHeader() {
+    try {
+      const response = await fetch(USER_API);
+      const data = await response.json();
+      if (!response.ok || data.error) {
+        throw new Error(data.error || 'Unable to load user data.');
+      }
+      dashboardUser = data.user || {};
+      renderDashboardHeader(dashboardUser);
+      if (!dashboardHeaderTimer) {
+        dashboardHeaderTimer = setInterval(() => renderDashboardHeader(dashboardUser), 60 * 1000);
+      }
+    } catch (err) {
+      console.warn('User header API failed:', err);
+      renderDashboardHeader();
+    }
   }
 
   async function loadDashboard() {
@@ -58,9 +81,71 @@ const sidebar  = document.getElementById('sidebar');
         throw new Error(data.error || 'Unable to load dashboard data.');
       }
       populateDashboard(data);
+      dashboardUser = data.user || {};
+      renderDashboardHeader(dashboardUser);
+      if (!dashboardHeaderTimer) {
+        dashboardHeaderTimer = setInterval(() => renderDashboardHeader(dashboardUser), 60 * 1000);
+      }
     } catch (err) {
       console.warn('Dashboard API failed:', err);
       setDashboardEmptyState();
+      renderDashboardHeader();
+    }
+  }
+
+  function getGreetingPhrase(hour) {
+    if (hour >= 5 && hour < 12) return 'Good morning';
+    if (hour >= 12 && hour < 17) return 'Good afternoon';
+    if (hour >= 17 && hour < 21) return 'Good evening';
+    return 'Good night';
+  }
+
+  function formatLocalDateTime(date) {
+    return new Intl.DateTimeFormat(navigator.language, {
+      weekday: 'short',
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+      timeZoneName: 'short'
+    }).format(date);
+  }
+
+  function renderDashboardHeader(user = {}) {
+    const now = new Date();
+    const greetingLabel = document.getElementById('greetingTimeOfDay');
+    const greetingName = document.getElementById('greetingName');
+    const topbarDate = document.getElementById('topbarDateText');
+
+    if (greetingLabel) {
+      greetingLabel.textContent = getGreetingPhrase(now.getHours());
+    }
+
+    if (greetingName) {
+      const name = user.full_name || [user.first_name, user.last_name].filter(Boolean).join(' ');
+      greetingName.textContent = name || 'there';
+    }
+
+    if (topbarDate) {
+      topbarDate.textContent = formatLocalDateTime(now);
+    }
+
+    const initialsEl = document.getElementById('topbarUserInitials');
+    const sidebarInitialsEl = document.getElementById('sidebarUserInitials');
+    const sidebarNameEl = document.getElementById('sidebarUserName');
+    const sidebarRoleEl = document.getElementById('sidebarUserRole');
+
+    if (user.full_name) {
+      const initials = user.full_name.split(' ').filter(Boolean).slice(0, 2).map(name => name.charAt(0).toUpperCase()).join('');
+      if (initialsEl) initialsEl.textContent = initials || 'US';
+      if (sidebarInitialsEl) sidebarInitialsEl.textContent = initials || 'US';
+      if (sidebarNameEl) sidebarNameEl.textContent = user.full_name;
+    }
+
+    if (sidebarRoleEl && user.role) {
+      sidebarRoleEl.textContent = user.role.charAt(0).toUpperCase() + user.role.slice(1);
     }
   }
 

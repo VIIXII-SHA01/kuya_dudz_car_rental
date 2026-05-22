@@ -406,8 +406,8 @@ function exportCSV() {
   const r=rentals.map(d=>[d.rentalId,d.customer,d.cusid,d.vehicle,d.plate,d.type,d.driver,d.status,d.pickup,d.ret,d.days,d.rate,d.total,d.location,d.notes]);
   const csv=[h,...r].map(row=>row.join(',')).join('\n');
   const blob=new Blob([csv],{type:'text/csv'});
-  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='REVV_Rentals.csv';a.click();
-  showToast('Exported as REVV_Rentals.csv','success');
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='KDCR_Rentals.csv';a.click();
+  showToast('Exported as KDCR_Rentals.csv','success');
 }
 
 /* ════ MODAL ════ */

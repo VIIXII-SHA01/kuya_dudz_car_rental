@@ -24,9 +24,13 @@ function updateThemeMode(mode) {
   localStorage.setItem(RENT_THEME_KEY, useLight ? 'light' : 'dark');
 }
 
-function initThemeMode() {
+function loadUserThemePreference() {
   const savedTheme = localStorage.getItem(RENT_THEME_KEY);
   updateThemeMode(savedTheme === 'light' ? 'light' : 'dark');
+}
+
+function initThemeMode() {
+  loadUserThemePreference();
 
   const toggle = document.getElementById('themeToggle');
   if (toggle) {

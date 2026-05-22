@@ -99,7 +99,19 @@
 
   function applyServerLoginError() {
     const params = new URLSearchParams(window.location.search);
-    if (params.get('error') !== 'invalid') return;
+    const error = params.get('error');
+    if (!error) return;
+
+    if (error === 'restricted') {
+      const reason = params.get('reason');
+      const msg = reason === 'restricted'
+        ? 'This account has been restricted and cannot sign in. Contact an administrator to restore access.'
+        : 'This account is not allowed to sign in. Contact an administrator.';
+      window.alert(msg);
+      return;
+    }
+
+    if (error !== 'invalid') return;
     if (emailInput) setFieldState('emailGroup', emailInput, false);
     if (passwordInput) setFieldState('passwordGroup', passwordInput, false);
 

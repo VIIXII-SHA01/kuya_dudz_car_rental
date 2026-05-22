@@ -220,6 +220,13 @@
   .form-row.full { grid-template-columns:1fr; }
   .form-row.three { grid-template-columns:1fr 1fr 1fr; }
   .form-group { display:flex; flex-direction:column; gap:7px; }
+  .autocomplete-group { position:relative; }
+  .autocomplete-dropdown { position:absolute; z-index:15; top:100%; left:0; right:0; background:var(--card); border:1px solid var(--border); border-top:none; border-radius:0 0 4px 4px; max-height:260px; overflow:auto; box-shadow:0 12px 30px rgba(0,0,0,0.3); }
+  .autocomplete-suggestion { width:100%; text-align:left; padding:12px 14px; border:none; background:transparent; color:var(--white); cursor:pointer; font-family:'Barlow',sans-serif; display:flex; flex-direction:column; gap:3px; }
+  .autocomplete-suggestion:hover { background:rgba(255,255,255,0.06); }
+  .suggestion-name { font-size:14px; font-weight:700; }
+  .suggestion-sub { font-size:12px; color:var(--muted2); }
+  .autocomplete-empty { padding:12px 14px; color:var(--muted2); font-size:13px; }
   .form-label { font-size:10px; font-weight:500; letter-spacing:1.5px; text-transform:uppercase; color:var(--muted); }
   .form-input,.form-select,.form-textarea { background:var(--card); border:1px solid var(--border); border-radius:3px; padding:11px 14px; color:var(--white); font-family:'Barlow',sans-serif; font-size:14px; outline:none; transition:border-color 0.2s,box-shadow 0.2s; width:100%; }
   .form-input::placeholder,.form-textarea::placeholder { color:var(--muted); }

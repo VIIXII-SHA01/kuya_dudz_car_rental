@@ -1,14 +1,92 @@
 <?php
 session_start();
 require_once __DIR__ . '/../databases/connection1.php';
+require_once __DIR__ . '/db_helpers.php';
 
 header('Content-Type: application/json');
 
-if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    http_response_code(405);
-    echo json_encode(['error' => 'Method not allowed']);
+if ($_SERVER['REQUEST_METHOD'] === 'GET') {
+    if (isset($_GET['plates_for'])) {
+        $vehicleId = (int) $_GET['plates_for'];
+        if ($vehicleId <= 0) {
+            echo json_encode(['plates' => []]);
+            exit;
+        }
+
+        $stmt = $conn->prepare('SELECT make, model FROM vehicles WHERE id = :id LIMIT 1');
+        $stmt->execute([':id' => $vehicleId]);
+        $vehicle = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$vehicle) {
+            echo json_encode(['plates' => []]);
+            exit;
+        }
+
+        $stmt = $conn->prepare('SELECT id, vehicle_ref, make, model, year, color, plate_no, category, daily_rate, status FROM vehicles WHERE make = :make AND model = :model ORDER BY plate_no ASC');
+        $stmt->execute([':make' => $vehicle['make'], ':model' => $vehicle['model']]);
+        $matches = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        $plates = array_map(function ($row) {
+            return [
+                'id' => (int) $row['id'],
+                'plate' => $row['plate_no'] ?? '',
+                'brand' => $row['make'] ?? '',
+                'model' => $row['model'] ?? '',
+                'type' => $row['category'] ?? '',
+                'rate' => isset($row['daily_rate']) ? (float) $row['daily_rate'] : 0.0,
+            ];
+        }, $matches);
+
+        echo json_encode(['plates' => $plates]);
+        exit;
+    }
+
+    if (isset($_GET['categories'])) {
+        $stmt = $conn->prepare("SELECT DISTINCT category FROM vehicles WHERE status = 'available' AND category IS NOT NULL AND TRIM(category) != '' ORDER BY category ASC");
+        $stmt->execute();
+        $categories = array_values(array_filter($stmt->fetchAll(PDO::FETCH_COLUMN), fn($c) => $c !== null && trim($c) !== ''));
+        echo json_encode(['categories' => $categories]);
+        exit;
+    }
+
+    $page = max(1, (int) ($_GET['page'] ?? 1));
+    $perPage = max(1, min(100, (int) ($_GET['per_page'] ?? 10)));
+    $offset = ($page - 1) * $perPage;
+    $search = trim((string) ($_GET['search'] ?? ''));
+
+    $where = [];
+    $params = [];
+    if ($search !== '') {
+        $where[] = '(make LIKE :q OR model LIKE :q OR plate_no LIKE :q OR category LIKE :q)';
+        $params[':q'] = '%' . $search . '%';
+    }
+
+    if (trim((string) ($_GET['available'] ?? '')) === '1') {
+        $where[] = 'status = :status';
+        $params[':status'] = 'available';
+        $where[] = 'id NOT IN (SELECT vehicle_id FROM bookings WHERE status NOT IN (\'done\', \'canceled\'))';
+    }
+
+    $whereSql = $where ? 'WHERE ' . implode(' AND ', $where) : '';
+
+    $countStmt = $conn->prepare('SELECT COUNT(*) FROM vehicles ' . $whereSql);
+    $countStmt->execute($params);
+    $total = (int) $countStmt->fetchColumn();
+
+    $sql = 'SELECT * FROM vehicles ' . $whereSql . ' ORDER BY id DESC LIMIT :offset, :perPage';
+    $stmt = $conn->prepare($sql);
+    foreach ($params as $key => $value) {
+        $stmt->bindValue($key, $value, PDO::PARAM_STR);
+    }
+    $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
+    $stmt->bindValue(':perPage', $perPage, PDO::PARAM_INT);
+    $stmt->execute();
+    $vehicles = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+    echo json_encode(['vehicles' => array_map('formatVehicle', $vehicles), 'total' => $total, 'page' => $page, 'per_page' => $perPage]);
     exit;
 }
+
+requireAdminSession();
 
 $contentType = $_SERVER['CONTENT_TYPE'] ?? $_SERVER['HTTP_CONTENT_TYPE'] ?? '';
 if (stripos($contentType, 'application/json') !== false) {
@@ -25,10 +103,10 @@ $year = isset($body['year']) ? (int) $body['year'] : 0;
 $color = trim($body['color'] ?? '');
 $type = trim($body['type'] ?? '');
 $plate = trim($body['plate'] ?? '');
-$seats = isset($body['seats']) ? (int) $body['seats'] : 0;
+$seats = array_key_exists('seats', $body) && $body['seats'] !== '' ? (int) $body['seats'] : null;
 $fuel = trim($body['fuel'] ?? '');
 $trans = trim($body['trans'] ?? '');
-$rate = isset($body['rate']) ? floatval($body['rate']) : 0.0;
+$rate = isset($body['rate']) && $body['rate'] !== '' ? floatval($body['rate']) : null;
 $mileage = isset($body['mileage']) ? (int) $body['mileage'] : 0;
 $status = trim($body['status'] ?? 'available');
 $notes = trim($body['notes'] ?? '');
@@ -93,6 +171,16 @@ try {
             exit;
         }
 
+        $stmt = $conn->prepare('SELECT main_photo FROM vehicles WHERE id = :id');
+        $stmt->execute([':id' => $id]);
+        $existingPhoto = $stmt->fetchColumn();
+        if ($existingPhoto) {
+            $existingPath = $uploadDir . basename($existingPhoto);
+            if (is_file($existingPath)) {
+                @unlink($existingPath);
+            }
+        }
+
         $stmt = $conn->prepare('DELETE FROM vehicles WHERE id = :id');
         $stmt->execute([':id' => $id]);
 
@@ -106,9 +194,9 @@ try {
         exit;
     }
 
-    if ($brand === '' || $model === '' || $year < 1900 || $type === '' || $plate === '' || $seats < 1 || $rate <= 0) {
+    if ($brand === '' || $model === '' || $year < 1900 || $type === '' || $plate === '' || $rate === null || $rate <= 0) {
         http_response_code(400);
-        echo json_encode(['error' => 'Please provide brand, model, year, type, plate, seats and rate.']);
+        echo json_encode(['error' => 'Please provide brand, model, year, type, plate and rate.']);
         exit;
     }
 
@@ -127,8 +215,10 @@ try {
 
     if ($columns['seats']) {
         $insertFields[] = 'seats';
-        $insertValues[':seats'] = $seats;
-        $updateSets[] = 'seats = :seats';
+        $insertValues[':seats'] = $seats ?? 0;
+        if ($seats !== null) {
+            $updateSets[] = 'seats = :seats';
+        }
     }
     if ($columns['fuel_type']) {
         $insertFields[] = 'fuel_type';
@@ -152,38 +242,73 @@ try {
         $updateSets[] = 'main_photo = :main_photo';
     }
 
-    if ($action === 'create') {
-        $maxId = (int) $conn->query('SELECT MAX(id) FROM vehicles')->fetchColumn();
-        $vehicleRef = 'VH-' . str_pad($maxId + 1, 4, '0', STR_PAD_LEFT);
-        $insertValues[':vehicle_ref'] = $vehicleRef;
+    $id = runInTransaction($conn, function () use (
+        $conn,
+        $action,
+        $id,
+        $insertFields,
+        $insertValues,
+        $updateSets,
+        $brand,
+        $model,
+        $plate,
+        $rate,
+        $photoFilename,
+        $uploadDir
+    ) {
+        if ($action === 'create') {
+            $maxId = (int) $conn->query('SELECT MAX(id) FROM vehicles')->fetchColumn();
+            $vehicleRef = 'VH-' . str_pad((string) ($maxId + 1), 4, '0', STR_PAD_LEFT);
+            $insertValues[':vehicle_ref'] = $vehicleRef;
 
-        $placeholders = array_map(fn($field) => ':' . $field, $insertFields);
-        $stmt = $conn->prepare('INSERT INTO vehicles (' . implode(', ', $insertFields) . ') VALUES (' . implode(', ', $placeholders) . ')');
-        $stmt->execute($insertValues);
-        $id = (int) $conn->lastInsertId();
-    } else {
+            $placeholders = array_map(fn ($field) => ':' . $field, $insertFields);
+            $stmt = $conn->prepare('INSERT INTO vehicles (' . implode(', ', $insertFields) . ') VALUES (' . implode(', ', $placeholders) . ')');
+            $stmt->execute($insertValues);
+
+            return (int) $conn->lastInsertId();
+        }
+
         if (!$id) {
             http_response_code(400);
             echo json_encode(['error' => 'Missing vehicle ID.']);
             exit;
         }
 
-        if ($photoFilename) {
-            $stmtExisting = $conn->prepare('SELECT main_photo FROM vehicles WHERE id = :id');
-            $stmtExisting->execute([':id' => $id]);
-            $existingPhoto = $stmtExisting->fetchColumn();
-            if ($existingPhoto) {
-                $existingPath = $uploadDir . basename($existingPhoto);
-                if (is_file($existingPath)) {
-                    @unlink($existingPath);
-                }
+        $stmtExisting = $conn->prepare('SELECT daily_rate, main_photo FROM vehicles WHERE id = :id LIMIT 1');
+        $stmtExisting->execute([':id' => $id]);
+        $existingVehicle = $stmtExisting->fetch(PDO::FETCH_ASSOC);
+        $existingPhoto = $existingVehicle ? $existingVehicle['main_photo'] : null;
+
+        if ($photoFilename && $existingPhoto) {
+            $existingPath = $uploadDir . basename($existingPhoto);
+            if (is_file($existingPath)) {
+                @unlink($existingPath);
             }
         }
 
         $stmt = $conn->prepare('UPDATE vehicles SET ' . implode(', ', $updateSets) . ' WHERE id = :id');
-        $insertValues[':id'] = $id;
-        $stmt->execute($insertValues);
-    }
+        $updateValues = $insertValues;
+        unset($updateValues[':vehicle_ref']);
+        $updateValues[':id'] = $id;
+        $stmt->execute($updateValues);
+
+        if ($rate !== null) {
+            $vehicleName = trim($brand . ' ' . $model);
+            $stmtBookingUpdate = $conn->prepare(
+                'UPDATE bookings
+                 SET rate = :rate,
+                     amount = ROUND(days * :rate, 2)
+                 WHERE status NOT IN (\'done\', \'canceled\')
+                   AND vehicle_id = :vehicle_id'
+            );
+            $stmtBookingUpdate->execute([
+                ':rate' => $rate,
+                ':vehicle_id' => $id,
+            ]);
+        }
+
+        return $id;
+    });
 
     $select = 'SELECT id, vehicle_ref, make, model, year, color, plate_no, category, daily_rate, status, main_photo, remarks';
     if ($columns['seats']) $select .= ', seats';

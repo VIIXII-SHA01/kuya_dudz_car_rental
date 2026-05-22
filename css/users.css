@@ -1,0 +1,656 @@
+.users-page, .users-page html, .users-page body {
+  min-height: 100%;
+  color: var(--white);
+  background: var(--black);
+  font-family: 'Barlow', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  overflow-x: hidden;
+}
+
+.users-page .app {
+  display: flex;
+  min-height: 100vh;
+}
+
+.users-page .sidebar {
+  width: 240px;
+  flex-shrink: 0;
+  background: var(--dark);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  position: fixed;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  z-index: 100;
+  transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.users-page .sidebar-logo {
+  padding: 28px 24px 20px;
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  border-bottom: 1px solid var(--border);
+  text-decoration: none;
+}
+
+.users-page .logo-hex {
+  width: 36px;
+  height: 36px;
+  background: var(--red);
+  clip-path: polygon(0 0,80% 0,100% 50%,80% 100%,0 100%,20% 50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.users-page .logo-wordmark {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 28px;
+  letter-spacing: 3px;
+  color: var(--white);
+  line-height: 1;
+}
+
+.users-page .sidebar-section {
+  padding: 20px 12px 8px;
+}
+
+.users-page .sidebar-section-label {
+  font-size: 9.5px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--muted);
+  font-weight: 500;
+  padding: 0 12px;
+  margin-bottom: 6px;
+}
+
+.users-page .nav-item {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 10px 12px;
+  border-radius: 3px;
+  cursor: pointer;
+  color: var(--muted2);
+  font-size: 14px;
+  font-weight: 400;
+  text-decoration: none;
+  transition: all 0.18s;
+  position: relative;
+  margin-bottom: 1px;
+}
+
+.users-page .nav-item:hover {
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--white);
+}
+
+.users-page .nav-item.active {
+  background: var(--red-dim);
+  color: var(--white);
+  font-weight: 500;
+}
+
+.users-page .nav-item.active::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 4px;
+  bottom: 4px;
+  width: 3px;
+  background: var(--red);
+  border-radius: 0 3px 3px 0;
+}
+
+.users-page .nav-icon {
+  opacity: 0.55;
+  flex-shrink: 0;
+}
+
+.users-page .nav-item.active .nav-icon,
+.users-page .nav-item:hover .nav-icon {
+  opacity: 1;
+}
+
+.users-page .sidebar-bottom {
+  margin-top: auto;
+  border-top: 1px solid var(--border);
+  padding: 16px 12px;
+}
+
+.users-page .user-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 3px;
+  cursor: pointer;
+  transition: background 0.18s;
+}
+
+.users-page .user-card:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.users-page .user-avatar {
+  width: 34px;
+  height: 34px;
+  background: linear-gradient(135deg, var(--red), var(--orange));
+  border-radius: 3px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 16px;
+  flex-shrink: 0;
+}
+
+.users-page .user-name {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--white);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.users-page .user-role {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.users-page .sidebar-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  z-index: 99;
+  opacity: 0;
+  transition: opacity 0.28s ease;
+  backdrop-filter: blur(2px);
+}
+
+.users-page .sidebar-overlay.active {
+  display: block;
+  opacity: 1;
+}
+
+.users-page .main {
+  flex: 1;
+  margin-left: 240px;
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+.users-page .topbar {
+  height: 64px;
+  background: var(--dark);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 0 32px;
+  position: sticky;
+  top: 0;
+  z-index: 40;
+}
+
+.users-page .topbar-title {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 22px;
+  letter-spacing: 3px;
+  color: var(--white);
+  white-space: nowrap;
+}
+
+.users-page .topbar-divider {
+  width: 1px;
+  height: 22px;
+  background: var(--border2);
+  flex-shrink: 0;
+}
+
+.users-page .topbar-right {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.users-page .topbar-date {
+  font-size: 12px;
+  color: var(--muted2);
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.users-page .icon-btn {
+  width: 38px;
+  height: 38px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  position: relative;
+  transition: border-color 0.2s;
+}
+
+.users-page .icon-btn:hover {
+  border-color: var(--border2);
+}
+
+.users-page .menu-toggle {
+  display: none;
+  width: 38px;
+  height: 38px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s;
+}
+
+.users-page .menu-toggle:hover {
+  border-color: var(--border2);
+  background: var(--card2);
+}
+
+.users-page .content {
+  flex: 1;
+  padding: 32px;
+  background: var(--black);
+  background-image: radial-gradient(ellipse 60% 40% at 0% 0%, rgba(232, 52, 26, 0.04) 0%, transparent 60%), radial-gradient(ellipse 50% 40% at 100% 100%, rgba(212, 168, 67, 0.03) 0%, transparent 60%);
+}
+
+.users-page .page-header {
+  margin-bottom: 24px;
+}
+
+.users-page .page-eyebrow {
+  font-size: 0.8rem;
+  color: var(--muted);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+
+.users-page .page-title {
+  font-size: 2rem;
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+
+.users-page .page-sub {
+  color: var(--muted2);
+  font-size: 0.95rem;
+}
+
+.users-page .setting-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.08);
+  margin-bottom: 22px;
+}
+
+.users-page .setting-card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  padding: 20px 26px;
+  border-bottom: 1px solid var(--border);
+}
+
+.users-page .setting-card-title {
+  font-size: 1.1rem;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+.users-page .setting-card-sub {
+  color: var(--muted2);
+  font-size: 0.92rem;
+}
+
+.users-page .setting-card-body {
+  padding: 24px 26px 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.users-page .form-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.users-page .form-row.full {
+  grid-template-columns: 1fr;
+}
+
+.users-page .form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.users-page .form-label {
+  color: var(--muted2);
+  font-size: 0.9rem;
+}
+
+.users-page .form-input,
+.users-page .form-textarea,
+.users-page select.form-input {
+  width: 100%;
+  border: 1px solid var(--border);
+  background: var(--card2);
+  border-radius: 14px;
+  color: var(--white);
+  padding: 14px 16px;
+  font-size: 0.95rem;
+  transition: border-color 0.2s ease;
+}
+
+.users-page .form-input:focus,
+.users-page .form-textarea:focus,
+.users-page select.form-input:focus {
+  outline: none;
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.users-page .form-textarea {
+  min-height: 120px;
+  resize: vertical;
+}
+
+.users-page .profile-avatar-row {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+
+.users-page .profile-avatar-lg {
+  width: 72px;
+  height: 72px;
+  border-radius: 22px;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.04));
+  display: grid;
+  place-items: center;
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: var(--white);
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.users-page .profile-avatar-info {
+  display: grid;
+  gap: 6px;
+}
+
+.users-page .profile-avatar-name {
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+
+.users-page .profile-avatar-role {
+  color: var(--muted2);
+  font-size: 0.95rem;
+}
+
+.users-page .save-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  border-top: 1px solid var(--border);
+  padding-top: 18px;
+}
+
+.users-page .save-bar-info {
+  color: var(--muted2);
+  font-size: 0.92rem;
+}
+
+.users-page .btn-primary,
+.users-page .btn-ghost,
+.users-page .btn-danger {
+  border: none;
+  border-radius: 14px;
+  padding: 12px 18px;
+  font-weight: 600;
+  font-size: 0.95rem;
+  cursor: pointer;
+}
+
+.users-page .btn-primary {
+  background: var(--red);
+  color: var(--white);
+}
+
+.users-page .btn-ghost {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--white);
+}
+
+.users-page .btn-danger {
+  background: #d93b3b;
+  color: #fff;
+}
+
+.users-page .alert {
+  padding: 14px 18px;
+  border-radius: 16px;
+  font-size: 0.95rem;
+}
+
+.users-page .alert.success {
+  background: rgba(67, 212, 134, 0.12);
+  color: #9de6b8;
+}
+
+.users-page .alert.error {
+  background: rgba(241, 79, 79, 0.14);
+  color: #ffb3b3;
+}
+
+.users-page .users-card-body {
+  overflow-x: auto;
+  width: 100%;
+}
+
+.users-page .users-table {
+  width: 100%;
+  max-width: 100%;
+  border-collapse: collapse;
+  min-width: 760px;
+}
+
+.users-page .users-table th,
+.users-page .users-table td {
+  text-align: left;
+  padding: 16px 18px;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.95rem;
+}
+
+.users-page .users-table th {
+  color: var(--muted2);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.users-page .users-table tr:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.users-page .actions-col {
+  width: 120px;
+}
+
+.users-page .actions-col .btn-ghost.small {
+  padding: 8px 12px;
+  font-size: 0.85rem;
+}
+
+.users-page .role-badge,
+.users-page .status-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.users-page .role-badge.role-admin {
+  background: rgba(232, 52, 26, 0.15);
+  color: #ff9f8b;
+}
+
+.users-page .role-badge.role-staff {
+  background: rgba(61, 143, 190, 0.15);
+  color: #9fd0ea;
+}
+
+.users-page .status-badge.active {
+  background: rgba(67, 212, 134, 0.12);
+  color: #9de6b8;
+}
+
+.users-page .status-badge.restricted {
+  background: rgba(241, 79, 79, 0.14);
+  color: #ffb3b3;
+}
+
+.users-page .row-restricted {
+  opacity: 0.72;
+}
+
+@media (max-width: 1200px) {
+  .users-page .sidebar {
+    width: 200px;
+  }
+
+  .users-page .main {
+    margin-left: 200px;
+  }
+}
+
+@media (max-width: 860px) {
+  .users-page .sidebar {
+    transform: translateX(-100%) !important;
+    z-index: 100;
+    transition: transform 0.3s ease;
+  }
+
+  .users-page .sidebar.open {
+    transform: translateX(0) !important;
+    box-shadow: 4px 0 32px rgba(0, 0, 0, 0.5);
+  }
+
+  .users-page .main {
+    margin-left: 0 !important;
+  }
+
+  .users-page .content {
+    padding: 20px 16px;
+  }
+
+  .users-page .topbar {
+    padding: 0 16px;
+  }
+
+  .users-page .menu-toggle {
+    display: flex !important;
+  }
+
+  .users-page .page-title {
+    font-size: 1.5rem;
+  }
+
+  .users-page .page-sub {
+    font-size: 0.9rem;
+  }
+
+  .users-page .setting-card {
+    border-radius: 14px;
+  }
+
+  .users-page .setting-card-body {
+    padding: 20px 20px 24px;
+  }
+
+  .users-page .save-bar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .users-page .save-bar button {
+    width: 100%;
+  }
+}
+
+@media (max-width: 940px) {
+  .users-page .form-row,
+  .users-page .form-row.three {
+    grid-template-columns: 1fr;
+  }
+
+  .users-page .setting-card-head {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .users-page .profile-avatar-row {
+    flex-wrap: wrap;
+  }
+
+  .users-page .profile-avatar-row > * {
+    flex: 1 1 100%;
+  }
+
+  .users-page .topbar {
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+
+  .users-page .topbar-right {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .users-page .page-header {
+    padding-bottom: 0;
+  }
+
+  .users-page .page-title {
+    font-size: 1.6rem;
+  }
+}
+
+@media (max-width: 640px) {
+  .users-page .page-title {
+    font-size: 1.6rem;
+  }
+
+  .users-page .setting-card-body {
+    padding: 20px 20px 24px;
+  }
+}

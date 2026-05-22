@@ -1,5 +1,28 @@
 :root {
   --theme-transition: background 0.25s ease, color 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease, fill 0.25s ease, stroke 0.25s ease;
+  /* Default Dark Mode Colors */
+  --black: #080A0C;
+  --dark: #0F1419;
+  --panel: #0F1419;
+  --card: #1A1F28;
+  --card2: #131820;
+  --border: rgba(255, 255, 255, 0.06);
+  --border2: rgba(255, 255, 255, 0.12);
+  --red: #E8341A;
+  --red-dim: rgba(232, 52, 26, 0.12);
+  --red-glow: rgba(232, 52, 26, 0.25);
+  --orange: #F5642A;
+  --gold: #D4A843;
+  --gold-dim: rgba(212, 168, 67, 0.12);
+  --white: #E0E5EB;
+  --muted: #9A9DA4;
+  --muted2: #9A9DA4;
+  --green: #3DBE7A;
+  --green-dim: rgba(61, 190, 122, 0.12);
+  --blue: #3B71F6;
+  --blue-dim: rgba(59, 113, 246, 0.12);
+  --purple: #8B5CF6;
+  --purple-dim: rgba(139, 92, 246, 0.12);
 }
 
 body.light-mode {
@@ -56,4 +79,557 @@ body,
 .theme-toggle:focus-visible {
   outline: 2px solid rgba(232, 52, 26, 0.35);
   outline-offset: 2px;
+}
+
+/* ════ ICON VISIBILITY IN LIGHT MODE ════ */
+body.light-mode svg {
+  color: var(--white);
+  fill: var(--white);
+  stroke: var(--white);
+}
+
+body.light-mode svg[color] {
+  color: var(--white);
+}
+
+body.light-mode svg[fill] {
+  fill: var(--white);
+}
+
+body.light-mode svg[stroke] {
+  stroke: var(--white);
+}
+
+body.light-mode .icon-btn svg {
+  color: var(--muted2);
+  fill: var(--muted2);
+  stroke: var(--muted2);
+}
+
+body.light-mode .icon-btn svg[color="currentColor"] {
+  color: var(--muted2);
+}
+
+body.light-mode .menu-toggle svg {
+  color: var(--white);
+  stroke: var(--white);
+}
+
+body.light-mode .search-icon {
+  color: var(--white);
+  stroke: var(--white);
+}
+
+body.light-mode .topbar svg {
+  color: var(--white);
+  fill: var(--white);
+  stroke: var(--white);
+}
+
+body.light-mode .topbar-date svg {
+  color: var(--muted2);
+  stroke: var(--muted2);
+}
+
+body.light-mode .notif-dot {
+  background: var(--red);
+}
+
+body.light-mode button svg {
+  color: inherit;
+  fill: inherit;
+  stroke: inherit;
+}
+
+body.light-mode .btn-primary svg {
+  color: white;
+  fill: white;
+  stroke: white;
+}
+
+body.light-mode .btn-ghost svg {
+  color: var(--white);
+  fill: var(--white);
+  stroke: var(--white);
+}
+
+body.light-mode .btn-danger svg {
+  color: #E8341A;
+  fill: #E8341A;
+  stroke: #E8341A;
+}
+
+body.light-mode .sidebar svg {
+  color: var(--white);
+  fill: var(--white);
+  stroke: var(--white);
+}
+
+body.light-mode nav svg {
+  color: var(--white);
+  fill: var(--white);
+  stroke: var(--white);
+}
+
+body.light-mode .toggle-row svg {
+  color: var(--white);
+  fill: var(--white);
+  stroke: var(--white);
+}
+
+body.light-mode table svg {
+  color: var(--muted2);
+  fill: var(--muted2);
+  stroke: var(--muted2);
+}
+
+body.light-mode .modal svg,
+body.light-mode .dialog svg {
+  color: var(--white);
+  fill: var(--white);
+  stroke: var(--white);
+}
+
+body.light-mode .form-group svg {
+  color: var(--muted2);
+  fill: var(--muted2);
+  stroke: var(--muted2);
+}
+
+body.light-mode .card svg {
+  color: var(--white);
+  fill: var(--white);
+  stroke: var(--white);
+}
+
+body.light-mode .stat-icon-wrap svg {
+  color: inherit;
+  fill: inherit;
+  stroke: inherit;
+}
+
+body.light-mode svg[color="#9A9DA4"] {
+  color: var(--muted2);
+  stroke: var(--muted2);
+}
+
+body.light-mode svg[color="white"],
+body.light-mode svg[color="#FFFFFF"] {
+  color: white;
+  fill: white;
+  stroke: white;
+}
+
+body.light-mode svg[color="currentColor"] {
+  color: var(--white);
+}
+
+body.light-mode .snav-item svg {
+  color: var(--white);
+  fill: var(--white);
+  stroke: var(--white);
+}
+
+body.light-mode .setting-card svg {
+  color: var(--white);
+  fill: var(--white);
+  stroke: var(--white);
+}
+
+body.light-mode .danger-zone svg {
+  color: #E8341A;
+  fill: #E8341A;
+  stroke: #E8341A;
+}
+
+body.light-mode .users-table svg {
+  color: var(--muted2);
+  fill: var(--muted2);
+  stroke: var(--muted2);
+}
+
+body.light-mode .stat-trend svg {
+  color: var(--green);
+  fill: var(--green);
+  stroke: var(--green);
+}
+
+body.light-mode .toast svg {
+  color: inherit;
+  fill: inherit;
+  stroke: inherit;
+}
+
+/* Form Select and Filter Dropdowns in Light Mode */
+body.light-mode .form-select,
+body.light-mode .filter-select {
+  background-image: url("data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%230F172A' stroke-width='1.4' stroke-linecap='round'/%3E%3C/svg%3E") !important;
+}
+
+/* Search Input Placeholder and Text */
+body.light-mode .search-input {
+  color: var(--white);
+}
+
+body.light-mode .search-input::placeholder {
+  color: var(--muted2);
+}
+
+/* Sidebar Navigation Icons */
+body.light-mode .sidebar .snav-item svg {
+  color: var(--white);
+  stroke: var(--white);
+  fill: var(--white);
+}
+
+/* Modal and Overlay Elements */
+body.light-mode .modal-backdrop,
+body.light-mode .dialog-backdrop {
+  background: rgba(15, 23, 42, 0.5);
+}
+
+/* Input Icons and Decorations */
+body.light-mode input[type="text"] svg,
+body.light-mode input[type="email"] svg,
+body.light-mode input[type="password"] svg,
+body.light-mode input[type="search"] svg,
+body.light-mode input[type="number"] svg,
+body.light-mode input[type="tel"] svg,
+body.light-mode textarea svg {
+  color: var(--muted2);
+  fill: var(--muted2);
+  stroke: var(--muted2);
+}
+
+/* Status and Badge Icons */
+body.light-mode .status-icon svg {
+  color: inherit;
+  fill: inherit;
+  stroke: inherit;
+}
+
+body.light-mode .status-dot {
+  color: var(--muted2);
+}
+
+body.light-mode .sdot.online {
+  background: var(--green);
+}
+
+body.light-mode .sdot.offline {
+  background: var(--muted2);
+}
+
+/* Badge Icons */
+body.light-mode .badge svg {
+  color: white;
+  fill: white;
+  stroke: white;
+}
+
+/* Avatar and User Icons */
+body.light-mode .u-avatar {
+  background: linear-gradient(135deg, var(--red), var(--orange));
+  color: white;
+}
+
+/* Action Button Icons */
+body.light-mode .act-btn svg {
+  color: var(--muted2);
+  stroke: var(--muted2);
+  fill: var(--muted2);
+}
+
+body.light-mode .act-btn.del svg {
+  color: var(--red);
+  stroke: var(--red);
+  fill: var(--red);
+}
+
+/* Header Section Icons */
+body.light-mode .page-header svg {
+  color: var(--white);
+  fill: var(--white);
+  stroke: var(--white);
+}
+
+/* Stats Grid Icons */
+body.light-mode .stat-card svg {
+  color: inherit;
+  fill: inherit;
+  stroke: inherit;
+}
+
+/* Chart and Graph Icons */
+body.light-mode .chart-icon svg,
+body.light-mode .graph-icon svg {
+  color: var(--white);
+  fill: var(--white);
+  stroke: var(--white);
+}
+
+/* Breadcrumb Icons */
+body.light-mode .breadcrumb svg {
+  color: var(--muted2);
+  stroke: var(--muted2);
+  fill: var(--muted2);
+}
+
+/* Loading Spinner */
+body.light-mode .spinner,
+body.light-mode .loader {
+  border-color: rgba(15, 23, 42, 0.1);
+  border-top-color: var(--red);
+}
+
+/* Separator and Divider Icons */
+body.light-mode .divider svg {
+  color: var(--border);
+  stroke: var(--border);
+  fill: var(--border);
+}
+
+/* Link Icons */
+body.light-mode a svg {
+  color: var(--white);
+  fill: var(--white);
+  stroke: var(--white);
+}
+
+body.light-mode a:hover svg {
+  color: var(--red);
+  fill: var(--red);
+  stroke: var(--red);
+}
+
+/* Disabled Element Icons */
+body.light-mode button:disabled svg,
+body.light-mode input:disabled ~ svg {
+  color: var(--muted);
+  fill: var(--muted);
+  stroke: var(--muted);
+  opacity: 0.5;
+}
+
+/* Error and Alert Icons */
+body.light-mode .alert svg,
+body.light-mode .error-icon svg {
+  color: var(--red);
+  fill: var(--red);
+  stroke: var(--red);
+}
+
+/* Success Icons */
+body.light-mode .success-icon svg,
+body.light-mode .checkmark svg {
+  color: var(--green);
+  fill: var(--green);
+  stroke: var(--green);
+}
+
+/* Warning Icons */
+body.light-mode .warning-icon svg {
+  color: var(--gold);
+  fill: var(--gold);
+  stroke: var(--gold);
+}
+
+/* Info Icons */
+body.light-mode .info-icon svg {
+  color: var(--blue);
+  fill: var(--blue);
+  stroke: var(--blue);
+}
+
+/* Table Row Action Icons */
+body.light-mode .row-actions svg {
+  color: var(--muted2);
+  stroke: var(--muted2);
+  fill: var(--muted2);
+}
+
+/* Tab Icons */
+body.light-mode .tab-icon svg {
+  color: var(--white);
+  fill: var(--white);
+  stroke: var(--white);
+}
+
+body.light-mode .tab-icon.active svg {
+  color: var(--red);
+  fill: var(--red);
+  stroke: var(--red);
+}
+
+/* Collapse/Expand Icons */
+body.light-mode .expand-icon,
+body.light-mode .collapse-icon {
+  color: var(--white);
+}
+
+body.light-mode .expand-icon svg,
+body.light-mode .collapse-icon svg {
+  color: var(--white);
+  stroke: var(--white);
+  fill: var(--white);
+}
+
+/* Ensure all text elements in light mode are readable */
+body.light-mode {
+  color: var(--white);
+}
+
+/* Override any hardcoded white colors in light mode */
+body.light-mode [color="white"] svg,
+body.light-mode [color="#FFFFFF"] svg,
+body.light-mode [color="#fff"] svg {
+  color: var(--white);
+  fill: var(--white);
+  stroke: var(--white);
+}
+
+/* Override any hardcoded gray colors */
+body.light-mode [color="#6A6E75"] svg,
+body.light-mode [color="#6A6E75"] {
+  color: var(--white) !important;
+  fill: var(--white) !important;
+  stroke: var(--white) !important;
+}
+
+/* Ensure buttons and interactive elements have visible icons */
+body.light-mode button:not(.btn-primary):not(.btn-danger) svg {
+  color: var(--white);
+  fill: var(--white);
+  stroke: var(--white);
+}
+
+/* Dropdown icons visibility */
+body.light-mode select {
+  color: var(--white);
+}
+
+/* Ensure icons in disabled state are visible */
+body.light-mode [disabled] svg,
+body.light-mode :disabled svg {
+  color: var(--muted);
+  fill: var(--muted);
+  stroke: var(--muted);
+  opacity: 0.6;
+}
+
+/* Active state icons */
+body.light-mode .active svg {
+  color: var(--red);
+  fill: var(--red);
+  stroke: var(--red);
+}
+
+/* Hover state icons */
+body.light-mode button:hover svg {
+  color: inherit;
+}
+
+/* Fix for any remaining hardcoded colors */
+body.light-mode svg[fill="#6A6E75"] {
+  fill: var(--white) !important;
+}
+
+body.light-mode svg[stroke="#6A6E75"] {
+  stroke: var(--white) !important;
+}
+
+body.light-mode svg[color="#9A9DA4"] {
+  color: var(--muted2) !important;
+}
+
+/* Additional fixes for common icon issues */
+
+/* SVG in links */
+body.light-mode a svg,
+body.light-mode a > svg {
+  color: var(--white) !important;
+  fill: var(--white) !important;
+  stroke: var(--white) !important;
+}
+
+/* SVG in lists */
+body.light-mode li svg {
+  color: var(--white);
+  fill: var(--white);
+  stroke: var(--white);
+}
+
+/* SVG in paragraphs */
+body.light-mode p svg {
+  color: var(--white);
+  fill: var(--white);
+  stroke: var(--white);
+}
+
+/* SVG in labels */
+body.light-mode label svg {
+  color: var(--white);
+  fill: var(--white);
+  stroke: var(--white);
+}
+
+/* Ensure notification/alert icons are visible */
+body.light-mode .alert-icon,
+body.light-mode .alert svg {
+  color: var(--red) !important;
+  fill: var(--red) !important;
+  stroke: var(--red) !important;
+}
+
+/* Floating action button icons */
+body.light-mode .fab svg,
+body.light-mode .fab-button svg {
+  color: white;
+  fill: white;
+  stroke: white;
+}
+
+/* Ensure all SVGs with no specific color attribute are visible */
+body.light-mode svg:not([color]):not([fill]):not([stroke]) {
+  color: var(--white);
+  fill: var(--white);
+  stroke: var(--white);
+}
+
+/* ════ SEARCH ELEMENTS IN LIGHT MODE ════ */
+body.light-mode .search-wrap {
+  display: flex;
+}
+
+body.light-mode .search-input {
+  color: var(--white) !important;
+  background: var(--card) !important;
+  border: 1px solid var(--border2) !important;
+}
+
+body.light-mode .search-input::placeholder {
+  color: var(--muted2) !important;
+}
+
+body.light-mode .search-input:focus {
+  border-color: var(--red) !important;
+  box-shadow: 0 0 0 3px rgba(232, 52, 26, 0.09) !important;
+  background: var(--card) !important;
+}
+
+body.light-mode .search-input:focus::placeholder {
+  color: var(--muted) !important;
+}
+
+body.light-mode .search-icon {
+  opacity: 1 !important;
+  color: var(--white) !important;
+  stroke: var(--white) !important;
+  fill: var(--white) !important;
+}
+
+body.light-mode .search-icon svg {
+  color: var(--white) !important;
+  stroke: var(--white) !important;
+  fill: var(--white) !important;
 }

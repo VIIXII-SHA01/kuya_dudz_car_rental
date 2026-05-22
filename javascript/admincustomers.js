@@ -430,8 +430,8 @@ function exportCSV() {
   const r=customers.map(d=>[d.id,d.fname,d.lname,d.email,d.phone,d.dob,d.address,d.idtype,d.idnum,d.emergency,d.tier,d.status,d.rentals,d.spent,d.joined]);
   const csv=[h,...r].map(row=>row.join(',')).join('\n');
   const blob=new Blob([csv],{type:'text/csv'});
-  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='REVV_Customers.csv';a.click();
-  showToast('Exported as REVV_Customers.csv','success');
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='KDCR_Customers.csv';a.click();
+  showToast('Exported as KDCR_Customers.csv','success');
 }
 
 /* ════ MODAL ════ */

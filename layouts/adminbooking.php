@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/../databases/connection1.php';
+require_once __DIR__ . '/../php/db_helpers.php';
 
 $bookings = [];
 $bookingSummary = [
@@ -10,12 +11,17 @@ $bookingSummary = [
   'overdue' => 0,
   'canceled' => 0,
 ];
+$availableVehicleCategories = [];
 
 function ensureBookingSchema(PDO $conn): void {
+    ensureBookingOverdueSchema($conn);
+
     $alterStatements = [
         "ALTER TABLE bookings ADD COLUMN customer_ref VARCHAR(32) DEFAULT NULL",
         "ALTER TABLE bookings ADD COLUMN vehicle_type VARCHAR(80) DEFAULT NULL",
         "ALTER TABLE bookings ADD COLUMN driver_type VARCHAR(50) DEFAULT NULL",
+        "ALTER TABLE bookings ADD COLUMN driver_id INT UNSIGNED DEFAULT NULL",
+        "ALTER TABLE bookings ADD COLUMN driver_charge DECIMAL(10,2) NOT NULL DEFAULT 0.00",
         "ALTER TABLE bookings ADD COLUMN location VARCHAR(255) DEFAULT NULL",
         "ALTER TABLE bookings ADD COLUMN rate DECIMAL(10,2) NOT NULL DEFAULT 0.00",
         "ALTER TABLE bookings MODIFY COLUMN status ENUM('pending','active','done','canceled','overdue') NOT NULL DEFAULT 'pending'"
@@ -32,6 +38,13 @@ function ensureBookingSchema(PDO $conn): void {
 
 try {
     ensureBookingSchema($conn);
+    reconcileAllOpenBookingsOverdue($conn);
+
+    $categoryStmt = $conn->prepare("SELECT DISTINCT category FROM vehicles WHERE status = 'available' AND category IS NOT NULL AND TRIM(category) != '' ORDER BY category ASC");
+    $categoryStmt->execute();
+    foreach ($categoryStmt->fetchAll(PDO::FETCH_COLUMN) as $category) {
+        $availableVehicleCategories[] = (string) $category;
+    }
 
     $stmt = $conn->prepare(
         'SELECT
@@ -39,22 +52,31 @@ try {
             b.customer_ref,
             b.vehicle_type,
             b.driver_type,
+            b.driver_id,
+            b.driver_charge,
             b.location,
             b.rate,
             b.pickup_date,
             b.return_date,
             b.days,
             b.amount,
+            b.base_amount,
+            b.overdue_days,
+            b.overdue_penalty,
+            b.overdue_rate_per_day,
             b.status,
             c.first_name AS cust_first_name,
             c.last_name AS cust_last_name,
             c.email AS cust_email,
             v.make AS vehicle_make,
             v.model AS vehicle_model,
-            v.plate_no
+            v.plate_no,
+            d.first_name AS driver_first_name,
+            d.last_name AS driver_last_name
          FROM bookings b
          LEFT JOIN customers c ON c.id = b.customer_id
          LEFT JOIN vehicles v ON v.id = b.vehicle_id
+         LEFT JOIN drivers d ON d.id = b.driver_id
          ORDER BY b.created_at DESC'
     );
     $stmt->execute();
@@ -77,6 +99,9 @@ try {
             'vehicle' => $vehicleName !== '' ? $vehicleName : ($row['plate_no'] ? 'Fleet Vehicle' : 'Unknown'),
             'vehicle_type' => $row['vehicle_type'] ?: 'Standard',
             'driver_type' => $row['driver_type'] ?: 'Self-drive',
+            'driver_id' => !empty($row['driver_id']) ? (int) $row['driver_id'] : null,
+            'driver_charge' => isset($row['driver_charge']) ? (float) $row['driver_charge'] : 0.0,
+            'driver_name' => trim(($row['driver_first_name'] ?? '') . ' ' . ($row['driver_last_name'] ?? '')),
             'location' => $row['location'] ?: '—',
             'rate' => (float) $row['rate'],
             'plate' => $row['plate_no'] ?: '—',
@@ -84,7 +109,12 @@ try {
             'ret' => $return,
             'days' => (int) $row['days'],
             'amount' => (float) $row['amount'],
+            'base_amount' => isset($row['base_amount']) ? (float) $row['base_amount'] : (float) $row['amount'],
+            'overdue_days' => isset($row['overdue_days']) ? (int) $row['overdue_days'] : 0,
+            'overdue_penalty' => isset($row['overdue_penalty']) ? (float) $row['overdue_penalty'] : 0.0,
+            'overdue_rate_per_day' => bookingOverdueRatePerDay($row),
             'status' => $status,
+            'can_delete' => isBookingDeletable($status),
         ];
 
         $bookingSummary['total']++;
@@ -99,10 +129,12 @@ try {
 <!DOCTYPE html>
 <html lang="en">
 <head>
+<?php include __DIR__ . '/../includes/favicon.php'; ?>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>REVV — Booking List</title>
+<title>KDCR — Booking List</title>
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow:ital,wght@0,300;0,400;0,500;0,600;1,300&family=Barlow+Condensed:wght@500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/rent/css/theme.css">
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -361,13 +393,60 @@ try {
   .modal-body { padding: 24px; }
   .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
   .form-row.full { grid-template-columns: 1fr; }
-  .form-group { display: flex; flex-direction: column; gap: 7px; }
+  .form-group { display: flex; flex-direction: column; gap: 7px; position: relative; }
   .form-label { font-size: 10px; font-weight: 500; letter-spacing: 1.5px; text-transform: uppercase; color: var(--muted); }
   .form-input, .form-select { background: var(--card); border: 1px solid var(--border); border-radius: 3px; padding: 11px 14px; color: var(--white); font-family: 'Barlow', sans-serif; font-size: 14px; outline: none; transition: border-color 0.2s, box-shadow 0.2s; width: 100%; }
   .form-input::placeholder { color: var(--muted); }
   .form-input:focus, .form-select:focus { border-color: var(--red); box-shadow: 0 0 0 3px rgba(232,52,26,0.09); }
   .form-select { appearance: none; background-image: url("data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%236A6E75' stroke-width='1.4' stroke-linecap='round'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 12px center; padding-right: 32px; }
   .form-select option { background: var(--card); }
+  .autocomplete-dropdown {
+    position: absolute;
+    top: calc(100% + 8px);
+    left: 0;
+    right: 0;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    box-shadow: 0 18px 42px rgba(0,0,0,0.35);
+    max-height: 320px;
+    overflow-y: auto;
+    z-index: 260;
+    padding: 6px 0;
+  }
+  .autocomplete-suggestion {
+    width: 100%;
+    border: none;
+    background: transparent;
+    color: var(--white);
+    text-align: left;
+    padding: 12px 14px;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .autocomplete-suggestion:hover,
+  .autocomplete-suggestion:focus {
+    background: rgba(255,255,255,0.06);
+    outline: none;
+  }
+  .suggestion-name { font-size: 14px; font-weight: 600; }
+  .suggestion-email { font-size: 12px; color: var(--muted2); }
+  .suggestion-status { font-size: 11px; font-weight: 600; letter-spacing: 0.5px; margin-top: 2px; }
+  .suggestion-status.available { color: var(--green); }
+  .suggestion-status.occupied { color: var(--orange); }
+  .suggestion-status.unavailable { color: var(--muted); }
+  .autocomplete-suggestion.is-occupied { opacity: 0.85; }
+  #driver-picker-row { display: none; }
+  #driver-picker-row.show { display: grid; }
+  #driver-charge-row { display: none; }
+  #driver-charge-row.show { display: grid; }
+  .autocomplete-empty {
+    padding: 14px 14px;
+    color: var(--muted2);
+    font-size: 13px;
+  }
   .modal-footer { display: flex; gap: 10px; justify-content: flex-end; padding: 16px 24px; border-top: 1px solid var(--border); }
 
   /* ══ TOAST ══ */
@@ -410,7 +489,7 @@ try {
 <div class="app">
 
   <!-- ══ SIDEBAR ══ -->
-  <?php include("../navs/adminnavs.php"); ?>
+  <?php include __DIR__ . '/../navs/adminnavs.php'; ?>
 
   <!-- Overlay (click to close sidebar on mobile) -->
   <div class="sidebar-overlay" id="sidebarOverlay"></div>
@@ -436,14 +515,17 @@ try {
       <div class="topbar-right">
         <div class="topbar-date">
           <svg width="13" height="13" viewBox="0 0 13 13" fill="none" color="currentColor"><rect x="1.5" y="2.5" width="10" height="9" rx="1.5" stroke="currentColor" stroke-width="1.2"/><path d="M4 2.5V1M9 2.5V1M1.5 5.5h10" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
-          Sat, 12 April 2026
+          <span id="topbarDateText">Sat, 12 April 2026</span>
         </div>
+        <button id="themeToggle" class="icon-btn theme-toggle" type="button" aria-label="Toggle theme" title="Toggle theme">
+          <span class="theme-toggle-icon">☀️</span>
+        </button>
         <div class="icon-btn">
           <svg width="17" height="17" viewBox="0 0 17 17" fill="none" color="#9A9DA4"><path d="M8.5 2a5 5 0 0 1 5 5v3l1.5 2H2L3.5 10V7a5 5 0 0 1 5-5z" stroke="currentColor" stroke-width="1.4"/><path d="M7 13.5a1.5 1.5 0 0 0 3 0" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
           <div class="notif-dot"></div>
         </div>
         <div class="icon-btn">
-          <div style="width:22px;height:22px;background:linear-gradient(135deg,var(--red),var(--orange));border-radius:2px;display:flex;align-items:center;justify-content:center;font-family:'Bebas Neue',sans-serif;font-size:11px;color:white">JG</div>
+          <div id="topbarUserInitials" style="width:22px;height:22px;background:linear-gradient(135deg,var(--red),var(--orange));border-radius:2px;display:flex;align-items:center;justify-content:center;font-family:'Bebas Neue',sans-serif;font-size:11px;color:white">JG</div>
         </div>
       </div>
     </header>
@@ -566,41 +648,42 @@ try {
     </div>
     <div class="modal-body">
       <div class="form-row">
-        <div class="form-group"><label class="form-label">Customer Name</label><input class="form-input" id="f-customer" placeholder="Full name"></div>
-        <div class="form-group"><label class="form-label">Customer ID</label><input class="form-input" id="f-customer-ref" placeholder="e.g. CUST-0042"></div>
+        <div class="form-group autocomplete-group"><label class="form-label">Customer Name</label><input class="form-input" id="f-customer" placeholder="Full name" autocomplete="off"><div class="autocomplete-dropdown" id="customerSuggestions" style="display:none"></div></div>
+        <div class="form-group"><label class="form-label">Customer ID</label><input class="form-input" id="f-customer-ref" placeholder="e.g. CUST-0042" autocomplete="off"></div>
       </div>
       <div class="form-row full">
         <div class="form-group"><label class="form-label">Customer Email</label><input class="form-input" id="f-email" placeholder="customer@example.com" type="email"></div>
       </div>
       <div class="form-row">
-        <div class="form-group">
-          <label class="form-label">Vehicle</label>
-          <select class="form-select" id="f-vehicle">
-            <option value="">Select vehicle…</option>
-            <option>Toyota Vios 1.3L</option>
-            <option>Honda City RS</option>
-            <option>Mitsubishi Mirage</option>
-            <option>Ford EcoSport</option>
-            <option>Hyundai Accent</option>
-            <option>Suzuki Swift</option>
-          </select>
-        </div>
-        <div class="form-group"><label class="form-label">Plate Number</label><input class="form-input" id="f-plate" placeholder="e.g. ABC-1234"></div>
+        <div class="form-group autocomplete-group"><label class="form-label">Vehicle</label><input class="form-input" id="f-vehicle" placeholder="Select vehicle…" autocomplete="off"><div class="autocomplete-dropdown" id="vehicleSuggestions" style="display:none"></div></div>
+        <div class="form-group autocomplete-group"><label class="form-label">Plate Number</label><input class="form-input" id="f-plate" placeholder="e.g. ABC-1234" autocomplete="off"><div class="autocomplete-dropdown" id="plateSuggestions" style="display:none"></div></div>
       </div>
       <div class="form-row">
         <div class="form-group">
           <label class="form-label">Vehicle Type</label>
           <select class="form-select" id="f-vehicle-type">
             <option value="">Choose type…</option>
-            <option>Sedan</option>
-            <option>SUV</option>
-            <option>Compact</option>
-            <option>MPV</option>
-            <option>Premium</option>
-            <option>Electric</option>
+            <?php foreach ($availableVehicleCategories as $category): ?>
+              <option value="<?php echo htmlspecialchars($category, ENT_QUOTES, 'UTF-8'); ?>"><?php echo htmlspecialchars($category, ENT_QUOTES, 'UTF-8'); ?></option>
+            <?php endforeach; ?>
           </select>
         </div>
         <div class="form-group"><label class="form-label">Driver Type</label><select class="form-select" id="f-driver-type"><option value="Self-drive">Self-drive</option><option value="With driver">With driver</option></select></div>
+      </div>
+      <div class="form-row full" id="driver-picker-row">
+        <div class="form-group autocomplete-group">
+          <label class="form-label">Assigned Driver</label>
+          <input class="form-input" id="f-driver" placeholder="Search driver by name or ID…" autocomplete="off">
+          <input type="hidden" id="f-driver-id" value="">
+          <div class="autocomplete-dropdown" id="driverSuggestions" style="display:none"></div>
+        </div>
+      </div>
+      <div class="form-row" id="driver-charge-row">
+        <div class="form-group">
+          <label class="form-label">Driver Additional Charge (₱)</label>
+          <input class="form-input" id="f-driver-charge" type="number" min="0" step="0.01" value="600" placeholder="600.00">
+          <div class="form-help">Added to the booking total when chauffeur is selected.</div>
+        </div>
       </div>
       <div class="form-row">
         <div class="form-group"><label class="form-label">Pickup Date</label><input class="form-input" id="f-pickup" type="date"></div>
@@ -611,7 +694,14 @@ try {
         <div class="form-group"><label class="form-label">Rate (₱/day)</label><input class="form-input" id="f-rate" type="number" placeholder="0.00"></div>
       </div>
       <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Overdue penalty per day (₱)</label>
+          <input class="form-input" id="f-overdue-rate" type="number" min="0" step="0.01" value="500" placeholder="500.00">
+          <div class="form-help" id="f-overdue-hint">Applied after return date: days late × rate per day.</div>
+        </div>
         <div class="form-group"><label class="form-label">Total Amount (₱)</label><input class="form-input" id="f-amount" type="number" placeholder="0.00"></div>
+      </div>
+      <div class="form-row">
         <div class="form-group">
           <label class="form-label">Status</label>
           <select class="form-select" id="f-status">
@@ -643,6 +733,7 @@ try {
   <span id="toastMsg"></span>
 </div>
 
+<script src="/rent/javascript/theme.js"></script>
 <script>
 /* ════════════════════════════════════
    SIDEBAR TOGGLE — the fix
@@ -728,6 +819,15 @@ function statusBadge(s) {
 function amountColor(s) {
   return s==='active' ? 'var(--green)' : s==='pending' ? 'var(--gold)' : s==='overdue' ? '#ff8f00' : s==='done' ? 'var(--blue)' : 'var(--muted)';
 }
+function canDeleteBooking(b) {
+  return b.can_delete === true || b.status === 'done' || b.status === 'canceled';
+}
+function deleteButtonHtml(b) {
+  if (!canDeleteBooking(b)) {
+    return '<div class="act-btn del disabled" title="Only completed or canceled bookings can be deleted" style="opacity:0.35;cursor:not-allowed;pointer-events:none"><svg width="13" height="13" viewBox="0 0 13 13" fill="none" color="currentColor"><path d="M2 3.5h9M5 3.5V2h3v1.5M10 3.5l-.7 7.5H3.7L3 3.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>';
+  }
+  return `<div class="act-btn del" title="Delete" onclick="deleteBooking('${b.id}',event)"><svg width="13" height="13" viewBox="0 0 13 13" fill="none" color="currentColor"><path d="M2 3.5h9M5 3.5V2h3v1.5M10 3.5l-.7 7.5H3.7L3 3.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>`;
+}
 
 function renderTable() {
   const data = bookings.filter(b => {
@@ -769,13 +869,13 @@ function renderTable() {
       <td><div class="date-main">${b.pickup}</div><div class="date-day">Pickup</div></td>
       <td><div class="date-main">${b.ret}</div><div class="date-day">Return</div></td>
       <td><span class="duration-pill"><svg width="11" height="11" viewBox="0 0 11 11" fill="none" color="currentColor"><circle cx="5.5" cy="5.5" r="4" stroke="currentColor" stroke-width="1.1"/><path d="M5.5 3.5v2l1.5 1" stroke="currentColor" stroke-width="1.1" stroke-linecap="round"/></svg>${b.days} day${b.days!==1?'s':''}</span></td>
-      <td><span class="amount" style="color:${amountColor(b.status)}">₱${b.amount>0?b.amount.toLocaleString():'—'}</span></td>
+      <td><span class="amount" style="color:${amountColor(b.status)}">₱${b.amount>0?b.amount.toLocaleString():'—'}</span>${b.overdue_penalty>0?`<div style="font-size:10px;color:#ff8f00;margin-top:2px">+₱${b.overdue_penalty.toLocaleString()} overdue (${b.overdue_days}d × ₱${(b.overdue_rate_per_day||500).toLocaleString()})</div>`:''}</td>
       <td>${statusBadge(b.status)}</td>
       <td>
         <div class="actions-cell" style="justify-content:center">
           <div class="act-btn view" title="View" onclick="viewBooking('${b.id}',event)"><svg width="13" height="13" viewBox="0 0 13 13" fill="none" color="currentColor"><path d="M1 6.5s2.5-4 5.5-4 5.5 4 5.5 4-2.5 4-5.5 4-5.5-4-5.5-4z" stroke="currentColor" stroke-width="1.2"/><circle cx="6.5" cy="6.5" r="1.5" stroke="currentColor" stroke-width="1.2"/></svg></div>
           <div class="act-btn edit" title="Edit" onclick="editBooking('${b.id}',event)"><svg width="13" height="13" viewBox="0 0 13 13" fill="none" color="currentColor"><path d="M2 9.5L9.5 2l1.5 1.5-7.5 7.5H2V9.5z" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
-          <div class="act-btn del" title="Delete" onclick="deleteBooking('${b.id}',event)"><svg width="13" height="13" viewBox="0 0 13 13" fill="none" color="currentColor"><path d="M2 3.5h9M5 3.5V2h3v1.5M10 3.5l-.7 7.5H3.7L3 3.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+          ${deleteButtonHtml(b)}
         </div>
       </td>
     </tr>
@@ -808,6 +908,11 @@ function editBooking(id, e) {
 }
 async function deleteBooking(id, e) {
   e.stopPropagation();
+  const booking = bookings.find(b => b.id === id);
+  if (booking && !canDeleteBooking(booking)) {
+    showToast('Only completed or canceled bookings can be deleted.','error');
+    return;
+  }
   if (!window.confirm('Delete booking #' + id + '?')) return;
 
   try {
@@ -859,6 +964,8 @@ function openModal({ mode='create', booking=null } = {}) {
     toggleModalFields(true);
   }
 
+  fetchVehicleCategories();
+  toggleDriverPicker();
   document.getElementById('modalOverlay').classList.add('show');
   document.body.style.overflow = 'hidden';
 }
@@ -882,18 +989,32 @@ function fillModalFields(booking) {
   document.getElementById('f-vehicle').value = booking?.vehicle || '';
   document.getElementById('f-vehicle-type').value = booking?.vehicle_type || '';
   document.getElementById('f-driver-type').value = booking?.driver_type || 'Self-drive';
+  document.getElementById('f-driver-id').value = booking?.driver_id ? String(booking.driver_id) : '';
+  document.getElementById('f-driver').value = booking?.driver_name || '';
+  const driverChargeInput = document.getElementById('f-driver-charge');
+  if (driverChargeInput) {
+    driverChargeInput.value = booking?.driver_charge != null && booking.driver_charge !== ''
+      ? booking.driver_charge
+      : (isWithDriverType(booking?.driver_type || '') ? '600' : '0');
+  }
+  toggleDriverPicker();
   document.getElementById('f-location').value = booking?.location || '';
   document.getElementById('f-plate').value = booking?.plate || '';
   document.getElementById('f-pickup').value = booking?.pickup ? formatInputDate(booking.pickup) : '';
   document.getElementById('f-return').value = booking?.ret ? formatInputDate(booking.ret) : '';
   document.getElementById('f-rate').value = booking?.rate ?? '';
+  const overdueRateInput = document.getElementById('f-overdue-rate');
+  if (overdueRateInput) {
+    overdueRateInput.value = booking?.overdue_rate_per_day != null ? booking.overdue_rate_per_day : '500';
+  }
   document.getElementById('f-amount').value = booking?.amount ?? '';
   document.getElementById('f-status').value = booking?.status || 'pending';
   document.getElementById('f-notes').value = booking?.notes || '';
+  updateOverdueHint(booking);
 }
 
 function toggleModalFields(disabled) {
-  ['f-customer','f-customer-ref','f-email','f-vehicle','f-vehicle-type','f-driver-type','f-location','f-plate','f-pickup','f-return','f-rate','f-amount','f-status','f-notes'].forEach(id => {
+  ['f-customer','f-customer-ref','f-email','f-vehicle','f-vehicle-type','f-driver-type','f-driver','f-driver-charge','f-location','f-plate','f-pickup','f-return','f-rate','f-overdue-rate','f-amount','f-status','f-notes'].forEach(id => {
     const input = document.getElementById(id);
     if (input) input.disabled = disabled;
   });
@@ -916,16 +1037,527 @@ function getModalData() {
     vehicle: document.getElementById('f-vehicle').value,
     vehicle_type: document.getElementById('f-vehicle-type').value,
     driver_type: document.getElementById('f-driver-type').value,
+    driver_id: document.getElementById('f-driver-id').value ? parseInt(document.getElementById('f-driver-id').value, 10) : null,
+    driver_charge: parseFloat(document.getElementById('f-driver-charge')?.value) || 0,
     location: document.getElementById('f-location').value.trim(),
     plate: document.getElementById('f-plate').value.trim(),
     pickup_date: document.getElementById('f-pickup').value,
     return_date: document.getElementById('f-return').value,
     rate: parseFloat(document.getElementById('f-rate').value) || 0,
+    overdue_rate_per_day: normalizeOverdueRatePerDay(document.getElementById('f-overdue-rate')?.value),
     amount: parseFloat(document.getElementById('f-amount').value) || 0,
     status: document.getElementById('f-status').value,
     notes: document.getElementById('f-notes').value.trim(),
   };
 }
+
+const CUSTOMER_API = '/rent/php/customer_action.php';
+const VEHICLE_API  = '/rent/php/vehicle_action.php';
+const DRIVER_API   = '/rent/php/driver_action.php';
+const customerNameInput = document.getElementById('f-customer');
+const customerIdInput = document.getElementById('f-customer-ref');
+const customerEmailInput = document.getElementById('f-email');
+const customerSuggestionsContainer = document.getElementById('customerSuggestions');
+const vehicleInput = document.getElementById('f-vehicle');
+const vehiclePlateInput = document.getElementById('f-plate');
+const vehicleRateInput = document.getElementById('f-rate');
+const vehicleTypeInput = document.getElementById('f-vehicle-type');
+const vehicleSuggestionsContainer = document.getElementById('vehicleSuggestions');
+const plateSuggestionsContainer = document.getElementById('plateSuggestions');
+const driverTypeInput = document.getElementById('f-driver-type');
+const driverPickerRow = document.getElementById('driver-picker-row');
+const driverChargeRow = document.getElementById('driver-charge-row');
+const driverChargeInput = document.getElementById('f-driver-charge');
+const driverNameInput = document.getElementById('f-driver');
+const driverIdInput = document.getElementById('f-driver-id');
+const driverSuggestionsContainer = document.getElementById('driverSuggestions');
+let customerSuggestionTimer = null;
+let vehicleSuggestionTimer = null;
+let driverSuggestionTimer = null;
+let selectedVehicleId = null;
+let plateOptions = [];
+
+const DEFAULT_OVERDUE_RATE_PER_DAY = 500;
+
+function normalizeOverdueRatePerDay(value) {
+  const rate = parseFloat(value);
+  if (Number.isNaN(rate)) return DEFAULT_OVERDUE_RATE_PER_DAY;
+  if (rate < 0) return 0;
+  if (rate > 100000) return 100000;
+  return Math.round(rate * 100) / 100;
+}
+
+function computeBookingOverdueDays(returnDate) {
+  if (!returnDate) return 0;
+  const ret = new Date(returnDate);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  ret.setHours(0, 0, 0, 0);
+  if (Number.isNaN(ret.valueOf()) || today <= ret) return 0;
+  return Math.max(0, Math.round((today - ret) / 86400000));
+}
+
+function isWithDriverType(value) {
+  const v = String(value || '').toLowerCase();
+  return v.includes('with') && v.includes('driver');
+}
+
+function toggleDriverPicker() {
+  const show = isWithDriverType(driverTypeInput.value);
+  driverPickerRow.classList.toggle('show', show);
+  if (driverChargeRow) driverChargeRow.classList.toggle('show', show);
+  if (!show) {
+    driverNameInput.value = '';
+    driverIdInput.value = '';
+    if (driverChargeInput) driverChargeInput.value = '0';
+    hideDriverSuggestions();
+  } else if (driverChargeInput && (!driverChargeInput.value || parseFloat(driverChargeInput.value) === 0)) {
+    driverChargeInput.value = '600';
+  }
+  calculateBookingAmount();
+}
+
+async function fetchDriverSuggestions(query = '') {
+  const q = String(query || '').trim();
+  const exclude = editingRef ? `&exclude_booking_ref=${encodeURIComponent(editingRef)}` : '';
+  const includeId = driverIdInput.value ? `&include_driver_id=${encodeURIComponent(driverIdInput.value)}` : '';
+  const url = `${DRIVER_API}?for_booking=1&per_page=20${q ? '&search=' + encodeURIComponent(q) : ''}${exclude}${includeId}`;
+
+  try {
+    const response = await fetch(url, { credentials: 'same-origin' });
+    if (!response.ok) throw new Error('Driver fetch failed');
+    const data = await response.json();
+    const drivers = Array.isArray(data.drivers) ? data.drivers : [];
+    renderDriverSuggestions(drivers);
+  } catch (error) {
+    renderDriverSuggestions([]);
+  }
+}
+
+function renderDriverSuggestions(drivers) {
+  driverSuggestionsContainer.innerHTML = '';
+
+  if (!drivers.length) {
+    driverSuggestionsContainer.innerHTML = '<div class="autocomplete-empty">No drivers found.</div>';
+    driverSuggestionsContainer.style.display = 'block';
+    return;
+  }
+
+  drivers.forEach(driver => {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'autocomplete-suggestion' + (driver.occupied ? ' is-occupied' : '');
+    button.dataset.id = String(driver.id);
+    button.dataset.name = `${driver.fname || ''} ${driver.lname || ''}`.trim();
+    button.dataset.occupied = driver.occupied ? '1' : '0';
+
+    const nameLabel = document.createElement('div');
+    nameLabel.className = 'suggestion-name';
+    nameLabel.textContent = button.dataset.name || driver.driver_ref || 'Unknown';
+
+    const subLabel = document.createElement('div');
+    subLabel.className = 'suggestion-email';
+    subLabel.textContent = [driver.driver_ref || '', driver.license || ''].filter(Boolean).join(' · ');
+
+    const statusLabel = document.createElement('div');
+    statusLabel.className = 'suggestion-status ' + (driver.occupied ? 'occupied' : 'available');
+    statusLabel.textContent = driver.availability || (driver.occupied ? 'Occupied' : 'Available');
+
+    button.appendChild(nameLabel);
+    button.appendChild(subLabel);
+    button.appendChild(statusLabel);
+    button.addEventListener('click', () => selectDriverSuggestion(button, driver));
+
+    driverSuggestionsContainer.appendChild(button);
+  });
+
+  driverSuggestionsContainer.style.display = 'block';
+}
+
+function hideDriverSuggestions() {
+  driverSuggestionsContainer.style.display = 'none';
+}
+
+function selectDriverSuggestion(button, driver) {
+  if (driver && driver.occupied) {
+    return;
+  }
+  driverNameInput.value = button.dataset.name;
+  driverIdInput.value = button.dataset.id;
+  hideDriverSuggestions();
+}
+
+function scheduleDriverSuggestions(query) {
+  if (!isWithDriverType(driverTypeInput.value)) return;
+  if (driverSuggestionTimer) clearTimeout(driverSuggestionTimer);
+  driverSuggestionTimer = window.setTimeout(() => fetchDriverSuggestions(query), 180);
+}
+
+function populateVehicleCategoryOptions(categories, selectedValue = '') {
+  vehicleTypeInput.innerHTML = '<option value="">Choose type…</option>';
+  categories.forEach(category => {
+    const option = document.createElement('option');
+    option.value = category;
+    option.textContent = category;
+    if (category === selectedValue) option.selected = true;
+    vehicleTypeInput.appendChild(option);
+  });
+}
+
+async function fetchVehicleCategories() {
+  try {
+    const response = await fetch(`${VEHICLE_API}?categories=1`, { credentials: 'same-origin' });
+    if (!response.ok) throw new Error('Category fetch failed');
+    const data = await response.json();
+    const categories = Array.isArray(data.categories) ? data.categories : [];
+    populateVehicleCategoryOptions(categories, vehicleTypeInput.value);
+  } catch (error) {
+    console.warn('Unable to load vehicle categories:', error);
+  }
+}
+
+async function fetchCustomerSuggestions(query = '') {
+  const q = String(query || '').trim();
+  const url = `${CUSTOMER_API}?per_page=10&exclude_status=blacklisted${q ? '&search=' + encodeURIComponent(q) : ''}`;
+
+  try {
+    const response = await fetch(url, { credentials: 'same-origin' });
+    if (!response.ok) throw new Error('Customer fetch failed');
+    const data = await response.json();
+    const customers = Array.isArray(data.customers) ? data.customers : [];
+    renderCustomerSuggestions(customers);
+  } catch (error) {
+    renderCustomerSuggestions([]);
+  }
+}
+
+function renderCustomerSuggestions(customers) {
+  customerSuggestionsContainer.innerHTML = '';
+
+  if (!customers.length) {
+    customerSuggestionsContainer.innerHTML = '<div class="autocomplete-empty">No customers found.</div>';
+    customerSuggestionsContainer.style.display = 'block';
+    return;
+  }
+
+  customers.forEach(customer => {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'autocomplete-suggestion';
+    button.dataset.name = `${customer.fname || ''} ${customer.lname || ''}`.trim();
+    button.dataset.ref = customer.ref || '';
+    button.dataset.email = customer.email || '';
+
+    const nameLabel = document.createElement('div');
+    nameLabel.className = 'suggestion-name';
+    nameLabel.textContent = button.dataset.name || customer.ref || 'Unknown';
+
+    const emailLabel = document.createElement('div');
+    emailLabel.className = 'suggestion-email';
+    emailLabel.textContent = customer.email || 'No email';
+
+    button.appendChild(nameLabel);
+    button.appendChild(emailLabel);
+    button.addEventListener('click', () => selectCustomerSuggestion(button));
+
+    customerSuggestionsContainer.appendChild(button);
+  });
+
+  customerSuggestionsContainer.style.display = 'block';
+}
+
+function hideCustomerSuggestions() {
+  customerSuggestionsContainer.style.display = 'none';
+}
+
+function selectCustomerSuggestion(button) {
+  customerNameInput.value = button.dataset.name;
+  customerIdInput.value = button.dataset.ref;
+  customerEmailInput.value = button.dataset.email;
+  hideCustomerSuggestions();
+}
+
+function selectVehicleSuggestion(button) {
+  selectedVehicleId = button.dataset.id ? Number(button.dataset.id) : null;
+  vehicleInput.value = button.dataset.name;
+  vehiclePlateInput.value = button.dataset.plate;
+  vehicleTypeInput.value = button.dataset.type || vehicleTypeInput.value;
+  vehicleRateInput.value = button.dataset.rate || vehicleRateInput.value;
+  hideVehicleSuggestions();
+  calculateBookingAmount();
+  if (selectedVehicleId) {
+    fetchPlateOptionsForVehicle(selectedVehicleId);
+  }
+}
+
+async function fetchPlateOptionsForVehicle(vehicleId) {
+  const url = `${VEHICLE_API}?plates_for=${encodeURIComponent(vehicleId)}`;
+  try {
+    const response = await fetch(url, { credentials: 'same-origin' });
+    if (!response.ok) throw new Error('Plate fetch failed');
+    const data = await response.json();
+    plateOptions = Array.isArray(data.plates) ? data.plates : [];
+    if (plateOptions.length <= 1) {
+      hidePlateSuggestions();
+    }
+  } catch (error) {
+    plateOptions = [];
+    hidePlateSuggestions();
+  }
+}
+
+function renderPlateSuggestions(plates) {
+  plateSuggestionsContainer.innerHTML = '';
+
+  if (!plates.length) {
+    plateSuggestionsContainer.innerHTML = '<div class="autocomplete-empty">No plates found for this car.</div>';
+    plateSuggestionsContainer.style.display = 'block';
+    return;
+  }
+
+  plates.forEach(entry => {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'autocomplete-suggestion';
+    button.dataset.plate = entry.plate || '';
+    button.dataset.rate = entry.rate || '';
+
+    const nameLabel = document.createElement('div');
+    nameLabel.className = 'suggestion-name';
+    nameLabel.textContent = entry.plate || 'Unknown plate';
+
+    const subLabel = document.createElement('div');
+    subLabel.className = 'suggestion-email';
+    subLabel.textContent = [entry.brand || '', entry.model || '', entry.type || ''].filter(Boolean).join(' • ');
+
+    button.appendChild(nameLabel);
+    button.appendChild(subLabel);
+    button.addEventListener('click', () => {
+      vehiclePlateInput.value = button.dataset.plate;
+      vehicleRateInput.value = button.dataset.rate || vehicleRateInput.value;
+      hidePlateSuggestions();
+    });
+
+    plateSuggestionsContainer.appendChild(button);
+  });
+
+  plateSuggestionsContainer.style.display = 'block';
+}
+
+function hidePlateSuggestions() {
+  plateSuggestionsContainer.style.display = 'none';
+}
+
+function getDriverChargeForTotal() {
+  if (!isWithDriverType(driverTypeInput.value)) {
+    return 0;
+  }
+  return parseFloat(driverChargeInput?.value) || 0;
+}
+
+function computeBookingAmount(rate, pickup, ret, driverCharge = 0, overdueRatePerDay = DEFAULT_OVERDUE_RATE_PER_DAY) {
+  const charge = Math.max(0, parseFloat(driverCharge) || 0);
+  let base = null;
+
+  if (pickup && ret && rate > 0) {
+    const start = new Date(pickup);
+    const end = new Date(ret);
+    if (!Number.isNaN(start.valueOf()) && !Number.isNaN(end.valueOf())) {
+      const days = Math.max(1, Math.round((end - start) / 86400000));
+      if (days > 0) {
+        base = rate * days;
+      }
+    }
+  }
+
+  if (base === null && charge <= 0) {
+    return null;
+  }
+
+  const baseAmount = (base || 0) + charge;
+  const overdueDays = computeBookingOverdueDays(ret);
+  const penalty = Math.round(overdueDays * normalizeOverdueRatePerDay(overdueRatePerDay) * 100) / 100;
+
+  return {
+    base: baseAmount,
+    overdueDays,
+    penalty,
+    total: Math.round((baseAmount + penalty) * 100) / 100,
+  };
+}
+
+function updateOverdueHint(booking = null) {
+  const hint = document.getElementById('f-overdue-hint');
+  if (!hint) return;
+
+  const ret = document.getElementById('f-return')?.value || (booking?.ret ? formatInputDate(booking.ret) : '');
+  const rate = normalizeOverdueRatePerDay(document.getElementById('f-overdue-rate')?.value ?? booking?.overdue_rate_per_day);
+  const overdueDays = computeBookingOverdueDays(ret);
+
+  if (!ret) {
+    hint.textContent = 'Applied after return date: days late × rate per day.';
+    return;
+  }
+
+  if (overdueDays > 0) {
+    const penalty = Math.round(overdueDays * rate * 100) / 100;
+    hint.textContent = `${overdueDays} day(s) late × ₱${rate.toLocaleString()} = ₱${penalty.toLocaleString()} overdue penalty.`;
+    hint.style.color = '#ff8f00';
+    return;
+  }
+
+  hint.textContent = 'No overdue days yet (return date is today or in the future).';
+  hint.style.color = '';
+}
+
+function calculateBookingAmount() {
+  const rate = parseFloat(vehicleRateInput.value) || 0;
+  const pickup = document.getElementById('f-pickup').value;
+  const ret = document.getElementById('f-return').value;
+  const overdueRate = document.getElementById('f-overdue-rate')?.value;
+  const totals = computeBookingAmount(rate, pickup, ret, getDriverChargeForTotal(), overdueRate);
+
+  if (totals === null) {
+    document.getElementById('f-amount').value = '';
+    updateOverdueHint();
+    return;
+  }
+
+  document.getElementById('f-amount').value = totals.total.toFixed(2);
+  updateOverdueHint();
+}
+
+async function fetchVehicleSuggestions(query = '') {
+  const q = String(query || '').trim();
+  const url = `${VEHICLE_API}?per_page=10&available=1${q ? '&search=' + encodeURIComponent(q) : ''}`;
+
+  try {
+    const response = await fetch(url, { credentials: 'same-origin' });
+    if (!response.ok) throw new Error('Vehicle fetch failed');
+    const data = await response.json();
+    const vehicles = Array.isArray(data.vehicles) ? data.vehicles : [];
+    renderVehicleSuggestions(vehicles);
+  } catch (error) {
+    renderVehicleSuggestions([]);
+  }
+}
+
+function renderVehicleSuggestions(vehicles) {
+  vehicleSuggestionsContainer.innerHTML = '';
+
+  const availableVehicles = vehicles.filter(vehicle => (vehicle.status || '').toLowerCase() === 'available');
+
+  if (!availableVehicles.length) {
+    vehicleSuggestionsContainer.innerHTML = '<div class="autocomplete-empty">No available vehicles found.</div>';
+    vehicleSuggestionsContainer.style.display = 'block';
+    return;
+  }
+
+  availableVehicles.forEach(vehicle => {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'autocomplete-suggestion';
+    button.dataset.id = vehicle.id;
+    button.dataset.name = `${vehicle.brand || ''} ${vehicle.model || ''}`.trim();
+    button.dataset.plate = vehicle.plate || '';
+    button.dataset.type = vehicle.type || '';
+    button.dataset.rate = vehicle.rate != null ? String(vehicle.rate) : '';
+
+    const nameLabel = document.createElement('div');
+    nameLabel.className = 'suggestion-name';
+    nameLabel.textContent = button.dataset.name || vehicle.plate || 'Unknown';
+
+    const subLabel = document.createElement('div');
+    subLabel.className = 'suggestion-email';
+    subLabel.textContent = [vehicle.plate || '', vehicle.type || ''].filter(Boolean).join(' • ');
+
+    button.appendChild(nameLabel);
+    button.appendChild(subLabel);
+    button.addEventListener('click', () => selectVehicleSuggestion(button));
+
+    vehicleSuggestionsContainer.appendChild(button);
+  });
+
+  vehicleSuggestionsContainer.style.display = 'block';
+}
+
+function hideVehicleSuggestions() {
+  vehicleSuggestionsContainer.style.display = 'none';
+}
+
+function scheduleVehicleSuggestions(query) {
+  if (vehicleSuggestionTimer) {
+    clearTimeout(vehicleSuggestionTimer);
+  }
+  vehicleSuggestionTimer = window.setTimeout(() => fetchVehicleSuggestions(query), 180);
+}
+
+function scheduleCustomerSuggestions(query) {
+  if (customerSuggestionTimer) {
+    clearTimeout(customerSuggestionTimer);
+  }
+  customerSuggestionTimer = window.setTimeout(() => fetchCustomerSuggestions(query), 180);
+}
+
+customerNameInput.addEventListener('focus', () => scheduleCustomerSuggestions(customerNameInput.value));
+customerNameInput.addEventListener('input', () => scheduleCustomerSuggestions(customerNameInput.value));
+vehicleInput.addEventListener('focus', () => scheduleVehicleSuggestions(vehicleInput.value));
+vehicleInput.addEventListener('input', () => {
+  selectedVehicleId = null;
+  plateOptions = [];
+  vehicleRateInput.value = '';
+  document.getElementById('f-amount').value = '';
+  hidePlateSuggestions();
+  scheduleVehicleSuggestions(vehicleInput.value);
+});
+vehiclePlateInput.addEventListener('focus', () => {
+  if (selectedVehicleId && plateOptions.length > 0) {
+    renderPlateSuggestions(plateOptions);
+  }
+});
+vehiclePlateInput.addEventListener('input', () => {
+  if (!selectedVehicleId) {
+    plateOptions = [];
+    hidePlateSuggestions();
+  }
+});
+document.getElementById('f-pickup').addEventListener('change', calculateBookingAmount);
+document.getElementById('f-return').addEventListener('change', calculateBookingAmount);
+const overdueRateInput = document.getElementById('f-overdue-rate');
+if (overdueRateInput) overdueRateInput.addEventListener('input', calculateBookingAmount);
+vehicleRateInput.addEventListener('input', calculateBookingAmount);
+driverTypeInput.addEventListener('change', toggleDriverPicker);
+if (driverChargeInput) driverChargeInput.addEventListener('input', calculateBookingAmount);
+driverNameInput.addEventListener('focus', () => scheduleDriverSuggestions(driverNameInput.value));
+driverNameInput.addEventListener('input', () => {
+  driverIdInput.value = '';
+  scheduleDriverSuggestions(driverNameInput.value);
+});
+
+document.addEventListener('click', event => {
+  const target = event.target;
+  if (target !== customerNameInput && !customerSuggestionsContainer.contains(target)) {
+    hideCustomerSuggestions();
+  }
+  if (target !== vehicleInput && !vehicleSuggestionsContainer.contains(target)) {
+    hideVehicleSuggestions();
+  }
+  if (target !== vehiclePlateInput && !plateSuggestionsContainer.contains(target)) {
+    hidePlateSuggestions();
+  }
+  if (target !== driverNameInput && !driverSuggestionsContainer.contains(target)) {
+    hideDriverSuggestions();
+  }
+});
+
+document.addEventListener('keydown', event => {
+  if (event.key === 'Escape') {
+    hideCustomerSuggestions();
+    hideVehicleSuggestions();
+    hidePlateSuggestions();
+    hideDriverSuggestions();
+  }
+});
 
 function updateSummaryCounts() {
   const counts = bookings.reduce((acc, b) => {
@@ -945,9 +1577,27 @@ async function saveBooking() {
   if (viewMode) return;
 
   const bookingData = getModalData();
-  if (!bookingData.customer || !bookingData.vehicle || !bookingData.plate || !bookingData.pickup_date || !bookingData.return_date) {
-    showToast('Please fill in all required fields.');
+  if (!bookingData.customer || !bookingData.customer_ref || !bookingData.vehicle || !bookingData.plate || !bookingData.pickup_date || !bookingData.return_date) {
+    showToast('Please fill in all required fields and select a registered customer.');
     return;
+  }
+
+  if (isWithDriverType(bookingData.driver_type) && !bookingData.driver_id) {
+    showToast('Please select a driver for chauffeur bookings.');
+    return;
+  }
+
+  const driverCharge = isWithDriverType(bookingData.driver_type) ? (bookingData.driver_charge || 0) : 0;
+  bookingData.driver_charge = driverCharge;
+  const computedAmount = computeBookingAmount(
+    bookingData.rate,
+    bookingData.pickup_date,
+    bookingData.return_date,
+    driverCharge,
+    bookingData.overdue_rate_per_day
+  );
+  if (computedAmount !== null) {
+    bookingData.amount = parseFloat(computedAmount.total.toFixed(2));
   }
 
   const action = editMode ? 'update' : 'create';
@@ -974,6 +1624,7 @@ async function saveBooking() {
     }
 
     renderTable();
+    fetchVehicleCategories();
     closeModal();
   } catch (err) {
     showToast('Unable to save booking. Please try again.','error');
@@ -985,8 +1636,8 @@ function exportCSV() {
   const rows = bookings.map(b => [b.id,b.customer,b.email,b.vehicle,b.plate,b.pickup,b.ret,b.days,b.amount,b.status]);
   const csv = [h,...rows].map(r=>r.join(',')).join('\n');
   const blob = new Blob([csv],{type:'text/csv'});
-  const a = document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='REVV_Bookings.csv'; a.click();
-  showToast('Exported as REVV_Bookings.csv','success');
+  const a = document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='KDCR_Bookings.csv'; a.click();
+  showToast('Exported as KDCR_Bookings.csv','success');
 }
 
 let sortDir = {};
@@ -1014,6 +1665,81 @@ function showToast(msg, type='error') {
   setTimeout(() => t.classList.remove('show'), 3400);
 }
 
+const USER_API = '/rent/php/user_action.php';
+let dashboardUser = {};
+let dashboardHeaderTimer = null;
+loadUserHeader();
+
+async function loadUserHeader() {
+  try {
+    const response = await fetch(USER_API);
+    const data = await response.json();
+    if (!response.ok || data.error) {
+      throw new Error(data.error || 'Unable to load user data.');
+    }
+    dashboardUser = data.user || {};
+    renderDashboardHeader(dashboardUser);
+    if (!dashboardHeaderTimer) {
+      dashboardHeaderTimer = setInterval(() => renderDashboardHeader(dashboardUser), 60 * 1000);
+    }
+  } catch (err) {
+    console.warn('User header API failed:', err);
+    renderDashboardHeader();
+  }
+}
+
+function getGreetingPhrase(hour) {
+  if (hour >= 5 && hour < 12) return 'Good morning';
+  if (hour >= 12 && hour < 17) return 'Good afternoon';
+  if (hour >= 17 && hour < 21) return 'Good evening';
+  return 'Good night';
+}
+
+function formatLocalDateTime(date) {
+  return new Intl.DateTimeFormat(navigator.language, {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+    timeZoneName: 'short'
+  }).format(date);
+}
+
+function renderDashboardHeader(user = {}) {
+  const now = new Date();
+  const topbarDate = document.getElementById('topbarDateText');
+  const initialsEl = document.getElementById('topbarUserInitials');
+
+  if (topbarDate) {
+    topbarDate.textContent = formatLocalDateTime(now);
+  }
+
+  if (initialsEl) {
+    const name = user.full_name || [user.first_name, user.last_name].filter(Boolean).join(' ');
+    const initials = name.split(' ').filter(Boolean).slice(0, 2).map(part => part.charAt(0).toUpperCase()).join('') || 'US';
+    initialsEl.textContent = initials;
+  }
+
+  const userNameEl = document.getElementById('sidebarUserName');
+  const userRoleEl = document.getElementById('sidebarUserRole');
+  const sidebarInitialsEl = document.getElementById('sidebarUserInitials');
+
+  if (sidebarInitialsEl) {
+    const name = user.full_name || [user.first_name, user.last_name].filter(Boolean).join(' ');
+    sidebarInitialsEl.textContent = name.split(' ').filter(Boolean).slice(0, 2).map(part => part.charAt(0).toUpperCase()).join('') || 'US';
+  }
+  if (userNameEl && user.full_name) {
+    userNameEl.textContent = user.full_name;
+  }
+  if (userRoleEl && user.role) {
+    userRoleEl.textContent = user.role;
+  }
+}
+
+fetchVehicleCategories();
 window.addEventListener('error', event => {
   showToast('JS error: ' + (event.message || 'Unknown error'), 'error');
   console.error(event.error || event.message, event.error);

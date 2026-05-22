@@ -1,14 +1,11 @@
 <?php
 session_start();
 require_once __DIR__ . '/../databases/connection1.php';
+require_once __DIR__ . '/db_helpers.php';
 
 header('Content-Type: application/json');
 
-if (!isset($_SESSION['user']) && !isset($_SESSION['user_id'])) {
-    http_response_code(401);
-    echo json_encode(['error' => 'Unauthorized.']);
-    exit;
-}
+requireAdminSession();
 
 $requestMethod = $_SERVER['REQUEST_METHOD'];
 $contentType = $_SERVER['CONTENT_TYPE'] ?? $_SERVER['HTTP_CONTENT_TYPE'] ?? '';
@@ -196,6 +193,11 @@ try {
         if (!empty($_GET['status'])) {
             $where[] = 'status = :status';
             $params[':status'] = $_GET['status'];
+        }
+
+        if (!empty($_GET['exclude_status'])) {
+            $where[] = 'status != :exclude_status';
+            $params[':exclude_status'] = $_GET['exclude_status'];
         }
 
         if (!empty($_GET['tier'])) {
@@ -397,31 +399,52 @@ try {
 
     $tierColumn = getCustomerTierColumn($conn);
 
-    if ($action === 'create') {
-        $customerRef = generateCustomerRef($conn);
-        $stmt = $conn->prepare(
-            "INSERT INTO customers (customer_ref, first_name, last_name, email, phone, dob, address, id_type, id_number, emergency_contact, $tierColumn, status, notes, avatar_bg, rentals, spent) VALUES (:customer_ref, :first_name, :last_name, :email, :phone, :dob, :address, :id_type, :id_number, :emergency_contact, :tier, :status, :notes, :avatar_bg, :rentals, :spent)"
-        );
-        $stmt->execute([
-            ':customer_ref' => $customerRef,
-            ':first_name' => $firstName,
-            ':last_name' => $lastName,
-            ':email' => $email,
-            ':phone' => $phone,
-            ':dob' => $dob ?: null,
-            ':address' => $address,
-            ':id_type' => $idType,
-            ':id_number' => $idNum,
-            ':emergency_contact' => $emergency,
-            ':tier' => $tier,
-            ':status' => $status,
-            ':notes' => $notes,
-            ':avatar_bg' => $avatarBg,
-            ':rentals' => 0,
-            ':spent' => 0.0,
-        ]);
-        $id = (int) $conn->lastInsertId();
-    } else {
+    $id = runInTransaction($conn, function () use (
+        $conn,
+        $action,
+        $id,
+        $firstName,
+        $lastName,
+        $email,
+        $phone,
+        $dob,
+        $address,
+        $idType,
+        $idNum,
+        $emergency,
+        $tier,
+        $status,
+        $notes,
+        $avatarBg,
+        $tierColumn
+    ) {
+        if ($action === 'create') {
+            $customerRef = generateCustomerRef($conn);
+            $stmt = $conn->prepare(
+                "INSERT INTO customers (customer_ref, first_name, last_name, email, phone, dob, address, id_type, id_number, emergency_contact, $tierColumn, status, notes, avatar_bg, rentals, spent) VALUES (:customer_ref, :first_name, :last_name, :email, :phone, :dob, :address, :id_type, :id_number, :emergency_contact, :tier, :status, :notes, :avatar_bg, :rentals, :spent)"
+            );
+            $stmt->execute([
+                ':customer_ref' => $customerRef,
+                ':first_name' => $firstName,
+                ':last_name' => $lastName,
+                ':email' => $email,
+                ':phone' => $phone,
+                ':dob' => $dob ?: null,
+                ':address' => $address,
+                ':id_type' => $idType,
+                ':id_number' => $idNum,
+                ':emergency_contact' => $emergency,
+                ':tier' => $tier,
+                ':status' => $status,
+                ':notes' => $notes,
+                ':avatar_bg' => $avatarBg,
+                ':rentals' => 0,
+                ':spent' => 0.0,
+            ]);
+
+            return (int) $conn->lastInsertId();
+        }
+
         if (! $id) {
             http_response_code(400);
             echo json_encode(['error' => 'Missing customer ID.']);
@@ -447,7 +470,9 @@ try {
             ':avatar_bg' => $avatarBg,
             ':id' => $id,
         ]);
-    }
+
+        return $id;
+    });
 
     $stmt = $conn->prepare('SELECT * FROM customers WHERE id = :id LIMIT 1');
     $stmt->execute([':id' => $id]);
@@ -463,6 +488,6 @@ try {
 } catch (Throwable $e) {
     error_log('customer_action error: ' . $e->getMessage());
     http_response_code(500);
-    echo json_encode(['error' => 'Unable to process the customer request. ' . $e->getMessage()]);
+    echo json_encode(['error' => 'Unable to process the customer request.']);
     exit;
 }

@@ -34,9 +34,9 @@ let editingId = null;
 
 async function loadDrivers() {
   try {
-    const response = await fetch('/rent/php/driver_action.php?per_page=1000');
+    const response = await fetch('/rent/php/driver_action.php?per_page=1000', { credentials: 'same-origin' });
     const json = await response.json();
-    if (!response.ok || !Array.isArray(json.drivers)) {
+    if (!response.ok || json.error || !Array.isArray(json.drivers)) {
       throw new Error(json.error || 'Unable to load drivers.');
     }
     drivers = json.drivers.map(driver => ({
@@ -50,18 +50,23 @@ async function loadDrivers() {
   }
 }
 
+function setSummaryCount(id, value) {
+  const el = document.getElementById(id);
+  if (el) el.textContent = value;
+}
+
 function updateSummaryCounts() {
   const total = drivers.length;
   const available = drivers.filter(d => d.status === 'available').length;
-  const onDuty = drivers.filter(d => d.status === 'on-duty').length;
-  const offDuty = drivers.filter(d => d.status === 'off-duty').length;
+  const rented = drivers.filter(d => d.status === 'rented' || d.status === 'on-duty').length;
+  const dayoff = drivers.filter(d => d.status === 'dayoff' || d.status === 'off-duty').length;
   const suspended = drivers.filter(d => d.status === 'suspended').length;
 
-  document.getElementById('totalDriversCount').textContent = total;
-  document.getElementById('availableDriversCount').textContent = available;
-  document.getElementById('onDutyDriversCount').textContent = onDuty;
-  document.getElementById('offDutyDriversCount').textContent = offDuty;
-  document.getElementById('suspendedDriversCount').textContent = suspended;
+  setSummaryCount('totalDriversCount', total);
+  setSummaryCount('availableDriversCount', available);
+  setSummaryCount('rentedDriversCount', rented);
+  setSummaryCount('dayoffDriversCount', dayoff);
+  setSummaryCount('suspendedDriversCount', suspended);
 }
 
 /* ════ HELPERS ════ */
@@ -80,7 +85,14 @@ function stars(r) {
 }
 
 function badgeHTML(s) {
-  const map = { available:['available','Available'], 'on-duty':['on-duty','On Duty'], 'off-duty':['off-duty','Off Duty'], suspended:['suspended','Suspended'] };
+  const map = {
+    available:['available','Available'],
+    rented:['on-duty','Rented'],
+    'on-duty':['on-duty','Rented'],
+    dayoff:['off-duty','Day Off'],
+    'off-duty':['off-duty','Day Off'],
+    suspended:['suspended','Suspended'],
+  };
   const [cls, label] = map[s]||['off-duty','Unknown'];
   return `<span class="badge ${cls}"><span class="badge-dot"></span>${label}</span>`;
 }
@@ -103,7 +115,7 @@ function showDocumentPreview(src, label) {
 }
 
 function onlineDotColor(s) {
-  return s==='available'?'var(--green)':s==='on-duty'?'var(--gold)':s==='suspended'?'#ff6b54':'var(--muted)';
+  return s==='available'?'var(--green)':(s==='rented'||s==='on-duty')?'var(--gold)':s==='suspended'?'#ff6b54':'var(--muted)';
 }
 
 /* ════ RENDER GRID ════ */
@@ -119,7 +131,7 @@ function renderGrid(data) {
           <div class="dc-avatar" style="background:${d.bg};overflow:hidden;position:relative">
             ${d.photo ? `<img src="${assetPath(d.photo)}" alt="${d.fname} ${d.lname}" style="width:100%;height:100%;object-fit:cover;border-radius:8px">` : `${ini(d)}<div style="position:absolute;inset:0;background:linear-gradient(135deg,rgba(255,255,255,0.12),transparent 60%)"></div>`}
           </div>
-          <div class="dc-online ${d.status==='available'?'active':d.status==='on-duty'?'on-duty':'offline'}" style="background:${onlineDotColor(d.status)}"></div>
+          <div class="dc-online ${d.status==='available'?'active':(d.status==='rented'||d.status==='on-duty')?'on-duty':'offline'}" style="background:${onlineDotColor(d.status)}"></div>
         </div>
         ${badgeHTML(d.status)}
       </div>
@@ -216,7 +228,9 @@ function getFiltered() {
   const q = currentSearch.toLowerCase();
   const expF = document.getElementById('expFilter').value;
   return drivers.filter(d => {
-    const matchStatus = currentFilter==='all' || d.status===currentFilter;
+    const matchStatus = currentFilter==='all' || d.status===currentFilter
+      || (currentFilter==='dayoff' && d.status==='off-duty')
+      || (currentFilter==='rented' && d.status==='on-duty');
     const matchSearch = !q || (d.fname+' '+d.lname).toLowerCase().includes(q) || d.license.toLowerCase().includes(q) || d.phone.includes(q) || d.email.toLowerCase().includes(q);
     const matchExp = !expF || (expF==='junior'&&d.exp<3) || (expF==='mid'&&d.exp>=3&&d.exp<7) || (expF==='senior'&&d.exp>=7);
     return matchStatus && matchSearch && matchExp;
@@ -480,8 +494,8 @@ function exportCSV() {
   const r=drivers.map(d=>[d.id,d.fname,d.lname,d.email,d.phone,d.dob,d.address,d.license,d.expiry,d.exp,d.lictype,d.status,d.rating,d.trips]);
   const csv=[h,...r].map(row=>row.join(',')).join('\n');
   const blob=new Blob([csv],{type:'text/csv'});
-  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='REVV_Drivers.csv';a.click();
-  showToast('Exported as REVV_Drivers.csv','success');
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='KDCR_Drivers.csv';a.click();
+  showToast('Exported as KDCR_Drivers.csv','success');
 }
 
 /* ════ MODAL ════ */
@@ -492,6 +506,10 @@ function closeModalOutside(e,id){if(e.target===document.getElementById(id))close
 /* ════ TOAST ════ */
 function showToast(msg,type='error'){
   const t=document.getElementById('toast'),tm=document.getElementById('toastMsg'),ti=document.getElementById('toastIcon');
+  if (!t || !tm) {
+    console.warn(msg);
+    return;
+  }
   tm.textContent=msg;
   const c=type==='success'?'#3DBE7A':'#E8341A';
   t.style.borderLeftColor=c;

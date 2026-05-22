@@ -1,17 +1,19 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+<?php include __DIR__ . '/../includes/favicon.php'; ?>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>REVV — Drivers</title>
+<title>KDCR — Drivers</title>
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow:ital,wght@0,300;0,400;0,500;0,600;1,300&family=Barlow+Condensed:wght@500;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/rent/css/admindrivers.css">
+<link rel="stylesheet" href="/rent/css/theme.css">
 </head>
 <body>
 <div class="app">
 
   <!-- ══ SIDEBAR ══ -->
- <?php include("../navs/adminnavs.php"); ?>
+  <?php include __DIR__ . '/../navs/adminnavs.php'; ?>
 
   <!-- Sidebar Overlay -->
   <div class="sidebar-overlay" id="sidebarOverlay"></div>
@@ -35,14 +37,17 @@
       <div class="topbar-right">
         <div class="topbar-date">
           <svg width="13" height="13" viewBox="0 0 13 13" fill="none" color="currentColor"><rect x="1.5" y="2.5" width="10" height="9" rx="1.5" stroke="currentColor" stroke-width="1.2"/><path d="M4 2.5V1M9 2.5V1M1.5 5.5h10" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
-          Sat, 12 April 2026
+          <span id="topbarDateText">Sat, 12 April 2026</span>
         </div>
+        <button id="themeToggle" class="icon-btn theme-toggle" type="button" aria-label="Toggle theme" title="Toggle theme">
+          <span class="theme-toggle-icon">☀️</span>
+        </button>
         <div class="icon-btn">
           <svg width="17" height="17" viewBox="0 0 17 17" fill="none" color="#9A9DA4"><path d="M8.5 2a5 5 0 0 1 5 5v3l1.5 2H2L3.5 10V7a5 5 0 0 1 5-5z" stroke="currentColor" stroke-width="1.4"/><path d="M7 13.5a1.5 1.5 0 0 0 3 0" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
           <div class="notif-dot"></div>
         </div>
         <div class="icon-btn">
-          <div style="width:22px;height:22px;background:linear-gradient(135deg,var(--red),var(--orange));border-radius:2px;display:flex;align-items:center;justify-content:center;font-family:'Bebas Neue',sans-serif;font-size:11px;color:white">JG</div>
+          <div id="topbarUserInitials" style="width:22px;height:22px;background:linear-gradient(135deg,var(--red),var(--orange));border-radius:2px;display:flex;align-items:center;justify-content:center;font-family:'Bebas Neue',sans-serif;font-size:11px;color:white">JG</div>
         </div>
       </div>
     </header>
@@ -79,8 +84,8 @@
       <div class="summary-strip">
         <div class="sstrip-item"><div class="sstrip-val" id="totalDriversCount">0</div><div class="sstrip-lab">Total Drivers</div></div>
         <div class="sstrip-item"><div class="sstrip-val" id="availableDriversCount" style="color:var(--green)">0</div><div class="sstrip-lab">Available</div></div>
-        <div class="sstrip-item"><div class="sstrip-val" id="onDutyDriversCount" style="color:var(--gold)">0</div><div class="sstrip-lab">On Duty</div></div>
-        <div class="sstrip-item"><div class="sstrip-val" id="offDutyDriversCount" style="color:var(--muted2)">0</div><div class="sstrip-lab">Off Duty</div></div>
+        <div class="sstrip-item"><div class="sstrip-val" id="rentedDriversCount" style="color:var(--gold)">0</div><div class="sstrip-lab">Rented</div></div>
+        <div class="sstrip-item"><div class="sstrip-val" id="dayoffDriversCount" style="color:var(--muted2)">0</div><div class="sstrip-lab">Day Off</div></div>
         <div class="sstrip-item"><div class="sstrip-val" id="suspendedDriversCount" style="color:var(--red)">0</div><div class="sstrip-lab">Suspended</div></div>
       </div>
 
@@ -89,8 +94,8 @@
         <div class="filter-tabs">
           <button class="ftab active" onclick="setFilter('all',this)">All</button>
           <button class="ftab" onclick="setFilter('available',this)">Available</button>
-          <button class="ftab" onclick="setFilter('on-duty',this)">On Duty</button>
-          <button class="ftab" onclick="setFilter('off-duty',this)">Off Duty</button>
+          <button class="ftab" onclick="setFilter('rented',this)">Rented</button>
+          <button class="ftab" onclick="setFilter('dayoff',this)">Day Off</button>
           <button class="ftab" onclick="setFilter('suspended',this)">Suspended</button>
         </div>
         <select class="filter-select" onchange="filterDrivers()" id="expFilter">
@@ -233,8 +238,7 @@
           <label class="form-label">Status</label>
           <select class="form-select" id="f-status">
             <option value="available">Available</option>
-            <option value="on-duty">On Duty</option>
-            <option value="off-duty">Off Duty</option>
+            <option value="dayoff">Day Off</option>
             <option value="suspended">Suspended</option>
           </select>
         </div>
@@ -319,7 +323,8 @@
   <span id="toastMsg"></span>
 </div>
 
-<script src="/rent/javascript/admindrivers.js?v=2"></script>
+<script src="/rent/javascript/theme.js"></script>
+<script src="/rent/javascript/admindrivers.js?v=3"></script>
 <script src="/rent/javascript/admindashboard.js"></script>
 </body>
 </html>

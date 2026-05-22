@@ -1,15 +1,11 @@
 <?php
 session_start();
 require_once __DIR__ . '/../databases/connection1.php';
+require_once __DIR__ . '/db_helpers.php';
 
 header('Content-Type: application/json');
 
-// Simple session-based auth guard: require a logged-in user
-if (!isset($_SESSION['user']) && !isset($_SESSION['user_id'])) {
-    http_response_code(401);
-    echo json_encode(['error' => 'Unauthorized.']);
-    exit;
-}
+requireAdminSession();
 
 $requestMethod = $_SERVER['REQUEST_METHOD'];
 $contentType = $_SERVER['CONTENT_TYPE'] ?? $_SERVER['HTTP_CONTENT_TYPE'] ?? '';
@@ -51,7 +47,7 @@ function formatDriver(array $row): array {
         'expiry' => $expiry ?? '',
         'exp' => isset($row['experience_years']) ? (int) $row['experience_years'] : 0,
         'lictype' => $row['license_type'] ?? 'Professional',
-        'status' => $row['status'] ?? 'available',
+        'status' => trim((string) ($row['status'] ?? '')) !== '' ? $row['status'] : 'available',
         'notes' => trim($row['notes'] ?? ''),
         'avatar_bg' => $row['avatar_bg'] ?? 'linear-gradient(135deg,#E8341A,#F5642A)',
         'photo' => $row['photo'] ?? null,
@@ -75,6 +71,78 @@ try {
                 exit;
             }
             echo json_encode(['driver' => formatDriver($driver)]);
+            exit;
+        }
+
+        if (isset($_GET['for_booking'])) {
+            reconcileStuckRentedDrivers($conn);
+
+            $search = trim((string) ($_GET['search'] ?? ''));
+            $excludeBookingRef = trim((string) ($_GET['exclude_booking_ref'] ?? ''));
+            $includeDriverId = (int) ($_GET['include_driver_id'] ?? 0);
+            $perPage = max(1, min(50, (int) ($_GET['per_page'] ?? 20)));
+
+            $where = ["status NOT IN ('suspended', 'rented', 'dayoff', 'on-duty', 'off-duty')"];
+            $params = [];
+            if ($includeDriverId > 0) {
+                $where = ['(status = \'available\' OR id = :include_driver_id)'];
+                $params[':include_driver_id'] = $includeDriverId;
+            }
+
+            if ($search !== '') {
+                $where[] = '(first_name LIKE :q OR last_name LIKE :q OR driver_ref LIKE :q OR license_no LIKE :q)';
+                $params[':q'] = '%' . $search . '%';
+            }
+
+            $whereSql = 'WHERE ' . implode(' AND ', $where);
+
+            $sql = "SELECT * FROM drivers $whereSql ORDER BY first_name ASC, last_name ASC LIMIT :perPage";
+            $stmt = $conn->prepare($sql);
+            foreach ($params as $key => $value) {
+                $stmt->bindValue($key, $value);
+            }
+            $stmt->bindValue(':perPage', $perPage, PDO::PARAM_INT);
+            $stmt->execute();
+            $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+            $drivers = [];
+            foreach ($rows as $row) {
+                $formatted = formatDriver($row);
+                $status = normalizeDriverStatus((string) ($formatted['status'] ?? ''));
+                $selectable = isDriverSelectableForBooking((string) ($row['status'] ?? ''))
+                    || ($includeDriverId > 0 && (int) $row['id'] === $includeDriverId);
+
+                if (!$selectable) {
+                    continue;
+                }
+
+                $occupied = $status === 'rented';
+                $occupiedRef = '';
+                if ($occupied && tableHasColumn($conn, 'bookings', 'driver_id')) {
+                    $occSql = "SELECT booking_ref FROM bookings WHERE driver_id = :driver_id AND status IN ('pending','active','overdue')";
+                    $occParams = [':driver_id' => (int) $row['id']];
+                    if ($excludeBookingRef !== '') {
+                        $occSql .= ' AND booking_ref != :exclude_ref';
+                        $occParams[':exclude_ref'] = $excludeBookingRef;
+                    }
+                    $occSql .= ' LIMIT 1';
+                    $occStmt = $conn->prepare($occSql);
+                    $occStmt->execute($occParams);
+                    $occRow = $occStmt->fetch(PDO::FETCH_ASSOC);
+                    if ($occRow) {
+                        $occupiedRef = (string) ($occRow['booking_ref'] ?? '');
+                    }
+                }
+
+                $formatted['occupied'] = $occupied;
+                $formatted['occupied_ref'] = $occupiedRef;
+                $formatted['availability'] = $occupied
+                    ? ('Rented' . ($occupiedRef !== '' ? ' · ' . $occupiedRef : ''))
+                    : 'Available';
+                $drivers[] = $formatted;
+            }
+
+            echo json_encode(['drivers' => $drivers]);
             exit;
         }
 
@@ -357,9 +425,12 @@ try {
         exit;
     }
 
-    $validStatuses = ['available', 'on-duty', 'off-duty', 'suspended'];
+    $validStatuses = ['available', 'rented', 'dayoff', 'suspended', 'on-duty', 'off-duty'];
     $validLicenseTypes = ['Professional', 'Non-Professional'];
-    $status = in_array($status, $validStatuses, true) ? $status : 'available';
+    $status = in_array($status, $validStatuses, true) ? normalizeDriverStatus($status) : 'available';
+    if ($status === 'rented' && $action === 'create') {
+        $status = 'available';
+    }
     $licenseType = in_array($licenseType, $validLicenseTypes, true) ? $licenseType : 'Professional';
 
     if ($action === 'create') {

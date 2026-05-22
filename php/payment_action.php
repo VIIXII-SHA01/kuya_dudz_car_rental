@@ -1,8 +1,11 @@
 <?php
 session_start();
 require_once __DIR__ . '/../databases/connection1.php';
+require_once __DIR__ . '/db_helpers.php';
 
 header('Content-Type: application/json');
+
+requireAdminSession();
 
 function sendJson(array $payload, int $statusCode = 200): void {
     http_response_code($statusCode);
@@ -10,13 +13,9 @@ function sendJson(array $payload, int $statusCode = 200): void {
     exit;
 }
 
-function tableHasColumn(PDO $conn, string $table, string $column): bool {
-    $stmt = $conn->prepare('SHOW COLUMNS FROM ' . $table . ' LIKE :column');
-    $stmt->execute([':column' => $column]);
-    return $stmt->fetch(PDO::FETCH_ASSOC) !== false;
-}
-
 function formatPayment(array $row): array {
+    $status = $row['status'] ?? 'pending';
+
     return [
         'id' => isset($row['id']) ? (int) $row['id'] : 0,
         'payId' => $row['payment_ref'] ?? '',
@@ -29,7 +28,8 @@ function formatPayment(array $row): array {
         'balance' => isset($row['balance']) ? (float) $row['balance'] : 0.0,
         'method' => $row['method'] ?? 'Cash',
         'ref' => $row['reference_no'] ?: '—',
-        'status' => $row['status'] ?? 'pending',
+        'status' => $status,
+        'can_delete' => isPaymentDeletable((string) $status),
         'notes' => $row['notes'] ?? '',
     ];
 }
@@ -53,6 +53,46 @@ function updateBookingPaymentStatus(PDO $conn, string $rentalRef, string $status
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'GET') {
+    reconcileAllOpenBookingsOverdue($conn);
+
+    $action = trim((string) ($_GET['action'] ?? ''));
+
+    if ($action === 'suggest') {
+        $search = trim((string) ($_GET['q'] ?? ''));
+        $limit = max(1, min(50, (int) ($_GET['limit'] ?? 10)));
+        $params = [':limit' => $limit];
+
+        $sql = 'SELECT
+            COALESCE(CONCAT(c.first_name, " ", c.last_name), b.customer_ref, "Guest Customer") AS customer_name,
+            COALESCE(c.customer_ref, b.customer_ref) AS customer_ref,
+            b.booking_ref,
+            b.amount AS total_due
+        FROM bookings b
+        LEFT JOIN customers c ON c.id = b.customer_id OR (c.customer_ref = b.customer_ref AND b.customer_id IS NULL)';
+
+        if ($search !== '') {
+            $sql .= ' WHERE (c.first_name LIKE :q OR c.last_name LIKE :q OR CONCAT(c.first_name, " ", c.last_name) LIKE :q OR c.customer_ref LIKE :q OR b.customer_ref LIKE :q OR b.booking_ref LIKE :q)';
+            $params[':q'] = '%' . $search . '%';
+        }
+
+        $sql .= ' ORDER BY b.booking_ref DESC LIMIT :limit';
+
+        try {
+            $stmt = $conn->prepare($sql);
+            $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
+            foreach ($params as $key => $value) {
+                if ($key !== ':limit') {
+                    $stmt->bindValue($key, $value, PDO::PARAM_STR);
+                }
+            }
+            $stmt->execute();
+            $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            sendJson(['suggestions' => $rows]);
+        } catch (PDOException $e) {
+            sendJson(['error' => 'Unable to load suggestions.'], 500);
+        }
+    }
+
     $search = trim((string) ($_GET['q'] ?? ''));
     $statusFilter = trim((string) ($_GET['status'] ?? ''));
     $sql = 'SELECT * FROM payments';
@@ -110,6 +150,16 @@ if ($action === 'delete') {
     }
 
     try {
+        $stmt = $conn->prepare('SELECT status FROM payments WHERE payment_ref = :payment_ref LIMIT 1');
+        $stmt->execute([':payment_ref' => $paymentRef]);
+        $paymentRow = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$paymentRow) {
+            sendJson(['error' => 'Payment not found.'], 404);
+        }
+        if (!isPaymentDeletable((string) ($paymentRow['status'] ?? ''))) {
+            sendJson(['error' => 'Only paid or refunded payments can be deleted.'], 400);
+        }
+
         $stmt = $conn->prepare('DELETE FROM payments WHERE payment_ref = :payment_ref');
         $stmt->execute([':payment_ref' => $paymentRef]);
         sendJson(['success' => true]);
@@ -122,58 +172,90 @@ if ($customerName === '' || $rentalRef === '' || $paymentDate === '') {
     sendJson(['error' => 'Customer name, rental ID, and payment date are required.'], 400);
 }
 
+if ($customerRef === '' && $rentalRef !== '') {
+    try {
+        $stmt = $conn->prepare('SELECT b.customer_ref AS booking_customer_ref, c.customer_ref AS customer_ref FROM bookings b LEFT JOIN customers c ON c.id = b.customer_id WHERE b.booking_ref = :booking_ref LIMIT 1');
+        $stmt->execute([':booking_ref' => $rentalRef]);
+        $found = $stmt->fetch(PDO::FETCH_ASSOC);
+        if ($found) {
+            $customerRef = trim((string) ($found['customer_ref'] ?? $found['booking_customer_ref'] ?? ''));
+        }
+    } catch (PDOException $e) {
+        // continue with provided customer_ref if lookup fails
+    }
+}
+
 $balance = $due - $paid;
 $referenceNo = $referenceNo === '' ? null : $referenceNo;
 
 try {
-    if ($action === 'create') {
-        $maxId = (int) $conn->query('SELECT MAX(id) FROM payments')->fetchColumn();
-        $paymentRef = 'PAY-' . str_pad($maxId + 1, 4, '0', STR_PAD_LEFT);
+    $paymentRef = runInTransaction($conn, function () use (
+        $conn,
+        $action,
+        $paymentRef,
+        $customerName,
+        $customerRef,
+        $rentalRef,
+        $paymentDate,
+        $due,
+        $paid,
+        $balance,
+        $method,
+        $referenceNo,
+        $status,
+        $notes
+    ) {
+        if ($action === 'create') {
+            $maxId = (int) $conn->query('SELECT MAX(id) FROM payments')->fetchColumn();
+            $paymentRef = 'PAY-' . str_pad((string) ($maxId + 1), 4, '0', STR_PAD_LEFT);
 
-        $stmt = $conn->prepare(
-            'INSERT INTO payments (payment_ref, customer_name, customer_ref, rental_ref, payment_date, due, paid, balance, method, reference_no, status, notes) VALUES (:payment_ref, :customer_name, :customer_ref, :rental_ref, :payment_date, :due, :paid, :balance, :method, :reference_no, :status, :notes)'
-        );
-        $stmt->execute([
-            ':payment_ref' => $paymentRef,
-            ':customer_name' => $customerName,
-            ':customer_ref' => $customerRef !== '' ? $customerRef : null,
-            ':rental_ref' => $rentalRef,
-            ':payment_date' => $paymentDate,
-            ':due' => $due,
-            ':paid' => $paid,
-            ':balance' => $balance,
-            ':method' => $method,
-            ':reference_no' => $referenceNo,
-            ':status' => $status,
-            ':notes' => $notes,
-        ]);
-        updateBookingPaymentStatus($conn, $rentalRef, $status);
-    } elseif ($action === 'update') {
-        if ($paymentRef === '') {
-            sendJson(['error' => 'Missing payment reference.'], 400);
+            $stmt = $conn->prepare(
+                'INSERT INTO payments (payment_ref, customer_name, customer_ref, rental_ref, payment_date, due, paid, balance, method, reference_no, status, notes) VALUES (:payment_ref, :customer_name, :customer_ref, :rental_ref, :payment_date, :due, :paid, :balance, :method, :reference_no, :status, :notes)'
+            );
+            $stmt->execute([
+                ':payment_ref' => $paymentRef,
+                ':customer_name' => $customerName,
+                ':customer_ref' => $customerRef !== '' ? $customerRef : null,
+                ':rental_ref' => $rentalRef,
+                ':payment_date' => $paymentDate,
+                ':due' => $due,
+                ':paid' => $paid,
+                ':balance' => $balance,
+                ':method' => $method,
+                ':reference_no' => $referenceNo,
+                ':status' => $status,
+                ':notes' => $notes,
+            ]);
+            updateBookingPaymentStatus($conn, $rentalRef, $status);
+        } elseif ($action === 'update') {
+            if ($paymentRef === '') {
+                sendJson(['error' => 'Missing payment reference.'], 400);
+            }
+
+            $stmt = $conn->prepare(
+                'UPDATE payments SET customer_name = :customer_name, customer_ref = :customer_ref, rental_ref = :rental_ref, payment_date = :payment_date, due = :due, paid = :paid, balance = :balance, method = :method, reference_no = :reference_no, status = :status, notes = :notes WHERE payment_ref = :payment_ref'
+            );
+            $stmt->execute([
+                ':customer_name' => $customerName,
+                ':customer_ref' => $customerRef !== '' ? $customerRef : null,
+                ':rental_ref' => $rentalRef,
+                ':payment_date' => $paymentDate,
+                ':due' => $due,
+                ':paid' => $paid,
+                ':balance' => $balance,
+                ':method' => $method,
+                ':reference_no' => $referenceNo,
+                ':status' => $status,
+                ':notes' => $notes,
+                ':payment_ref' => $paymentRef,
+            ]);
+            updateBookingPaymentStatus($conn, $rentalRef, $status);
+        } else {
+            sendJson(['error' => 'Unknown action.'], 400);
         }
 
-        $stmt = $conn->prepare(
-            'UPDATE payments SET customer_name = :customer_name, customer_ref = :customer_ref, rental_ref = :rental_ref, payment_date = :payment_date, due = :due, paid = :paid, balance = :balance, method = :method, reference_no = :reference_no, status = :status, notes = :notes WHERE payment_ref = :payment_ref'
-        );
-        $stmt->execute([
-            ':customer_name' => $customerName,
-            ':customer_ref' => $customerRef !== '' ? $customerRef : null,
-            ':rental_ref' => $rentalRef,
-            ':payment_date' => $paymentDate,
-            ':due' => $due,
-            ':paid' => $paid,
-            ':balance' => $balance,
-            ':method' => $method,
-            ':reference_no' => $referenceNo,
-            ':status' => $status,
-            ':notes' => $notes,
-            ':payment_ref' => $paymentRef,
-        ]);
-        updateBookingPaymentStatus($conn, $rentalRef, $status);
-    } else {
-        sendJson(['error' => 'Unknown action.'], 400);
-    }
+        return $paymentRef;
+    });
 
     $stmt = $conn->prepare('SELECT * FROM payments WHERE payment_ref = :payment_ref LIMIT 1');
     $stmt->execute([':payment_ref' => $paymentRef]);
@@ -185,5 +267,7 @@ try {
 
     sendJson(['payment' => formatPayment($row)]);
 } catch (PDOException $e) {
+    sendJson(['error' => 'Unable to save payment.'], 500);
+} catch (Throwable $e) {
     sendJson(['error' => 'Unable to save payment.'], 500);
 }

@@ -1,18 +1,20 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+<?php include __DIR__ . '/../includes/favicon.php'; ?>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>REVV — Dashboard</title>
+<title>KDCR — Dashboard</title>
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow:ital,wght@0,300;0,400;0,500;0,600;1,300&family=Barlow+Condensed:wght@500;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/rent/css/admindashboard.css">
+<link rel="stylesheet" href="/rent/css/theme.css">
 </head>
 <body>
 <div class="app">
 
   <!-- ══ SIDEBAR ══ -->
 
-  <?php include("../navs/adminnavs.php"); ?>
+  <?php include __DIR__ . '/../navs/adminnavs.php'; ?>
 
   <!-- Overlay -->
   <div class="sidebar-overlay" id="sidebarOverlay"></div>
@@ -40,14 +42,17 @@
       <div class="topbar-right">
         <div class="topbar-date">
           <svg width="13" height="13" viewBox="0 0 13 13" fill="none" color="currentColor"><rect x="1.5" y="2.5" width="10" height="9" rx="1.5" stroke="currentColor" stroke-width="1.2"/><path d="M4 2.5V1M9 2.5V1M1.5 5.5h10" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
-          Sat, 12 April 2026
+          <span id="topbarDateText">Sat, 12 April 2026 · 10:00 AM</span>
         </div>
+        <button id="themeToggle" class="icon-btn theme-toggle" type="button" aria-label="Toggle theme" title="Toggle theme">
+          <span class="theme-toggle-icon">☀️</span>
+        </button>
         <div class="icon-btn">
           <svg width="17" height="17" viewBox="0 0 17 17" fill="none" color="#9A9DA4"><path d="M8.5 2a5 5 0 0 1 5 5v3l1.5 2H2L3.5 10V7a5 5 0 0 1 5-5z" stroke="currentColor" stroke-width="1.4"/><path d="M7 13.5a1.5 1.5 0 0 0 3 0" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
           <div class="notif-dot"></div>
         </div>
         <div class="icon-btn">
-          <div style="width:22px;height:22px;background:linear-gradient(135deg,var(--red),var(--orange));border-radius:2px;display:flex;align-items:center;justify-content:center;font-family:'Bebas Neue',sans-serif;font-size:11px;color:white">JG</div>
+          <div id="topbarUserInitials" style="width:22px;height:22px;background:linear-gradient(135deg,var(--red),var(--orange));border-radius:2px;display:flex;align-items:center;justify-content:center;font-family:'Bebas Neue',sans-serif;font-size:11px;color:white">JG</div>
         </div>
       </div>
     </header>
@@ -58,8 +63,8 @@
       <!-- Greeting -->
       <div style="display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:28px;flex-wrap:wrap;gap:12px">
         <div>
-          <div style="font-size:11.5px;color:var(--muted2);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:5px">Good morning</div>
-          <div style="font-family:'Bebas Neue',sans-serif;font-size:clamp(26px,3vw,38px);letter-spacing:2px;line-height:1">Welcome back, <span style="color:var(--red)">Jayne</span></div>
+          <div id="greetingTimeOfDay" style="font-size:11.5px;color:var(--muted2);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:5px">Good morning</div>
+          <div style="font-family:'Bebas Neue',sans-serif;font-size:clamp(26px,3vw,38px);letter-spacing:2px;line-height:1">Welcome back, <span id="greetingName" style="color:var(--red)">Jayne</span></div>
         </div>
         <div style="display:flex;gap:10px;flex-wrap:wrap">
           <a href="/rent/vehicles" style="display:flex;align-items:center;gap:8px;padding:10px 18px;background:var(--card);border:1px solid var(--border2);border-radius:3px;color:var(--white);font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;cursor:pointer;transition:all 0.18s;text-decoration:none" onmouseover="this.style.borderColor='var(--red)'" onmouseout="this.style.borderColor='var(--border2)'">
@@ -230,6 +235,7 @@
   </div><!-- /main -->
 </div><!-- /app -->
 
+<script src="/rent/javascript/theme.js"></script>
 <script src="/rent/javascript/admindashboard.js"></script>
 </body>
 </html>

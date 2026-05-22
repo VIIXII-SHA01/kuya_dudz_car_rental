@@ -1,9 +1,10 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+<?php include __DIR__ . '/../includes/favicon.php'; ?>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>REVV — Forgot Password</title>
+<title>KDCR — Forgot Password</title>
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow:ital,wght@0,300;0,400;0,500;0,600;1,300&family=Barlow+Condensed:wght@500;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/rent/css/forgotpassword.css">
 </head>
@@ -28,7 +29,7 @@
           <circle cx="11.5" cy="9.5" r="1.8" fill="white"/>
         </svg>
       </div>
-      <span class="logo-wordmark">REVV</span>
+      <span class="logo-wordmark">KDCR</span>
     </a>
 
     <!-- Central illustration -->
@@ -119,11 +120,11 @@
         <div class="logo-hex">
           <svg width="14" height="10" viewBox="0 0 16 12" fill="none"><path d="M1 9L4 3h8l3 6" stroke="white" stroke-width="1.8" stroke-linecap="round"/><circle cx="4.5" cy="9.5" r="1.8" fill="white"/><circle cx="11.5" cy="9.5" r="1.8" fill="white"/></svg>
         </div>
-        <span class="logo-wordmark">REVV</span>
+        <span class="logo-wordmark">KDCR</span>
       </div>
 
       <!-- Back to login -->
-      <a class="back-link" href="carrental_login.html">
+      <a class="back-link" href="/rent/login">
         <svg width="16" height="16" viewBox="0 0 16 16" fill="none" color="currentColor">
           <path d="M10 4L6 8l4 4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
         </svg>
@@ -141,7 +142,8 @@
       <div class="stage active" id="stage1">
         <div class="stage-eyebrow">Step 1 of 3</div>
         <div class="stage-title">Forgot Password</div>
-        <div class="stage-desc">Enter the email address linked to your REVV account and we'll send you a reset code.</div>
+        <div class="stage-desc">Enter the email address linked to your KDCR account and we'll send you a reset code.</div>
+        <div class="stage-note">If you don't see the email in your inbox, please check your spam/junk folder.</div>
 
         <div class="field-group" id="grp-email">
           <label class="field-label" for="emailInput">Email Address</label>
@@ -167,7 +169,7 @@
         </button>
 
         <div style="text-align:center;margin-top:20px;font-size:13px;color:var(--muted2)">
-          Remember your password? <a href="carrental_login.html" style="color:var(--red);text-decoration:none;font-weight:500">Sign in →</a>
+          Remember your password? <a href="/rent/login" style="color:var(--red);text-decoration:none;font-weight:500">Sign in →</a>
         </div>
       </div>
 
@@ -232,7 +234,7 @@
       <div class="stage" id="stage3">
         <div class="stage-eyebrow">Step 3 of 3</div>
         <div class="stage-title">New Password</div>
-        <div class="stage-desc">Create a strong new password for your REVV account.</div>
+        <div class="stage-desc">Create a strong new password for your KDCR account.</div>
 
         <!-- New password -->
         <div class="field-group" id="grp-newpass">
@@ -316,8 +318,8 @@
           </svg>
         </div>
         <div class="success-title">Password Reset!</div>
-        <div class="success-desc">Your REVV password has been updated successfully.<br>You can now sign in with your new credentials.</div>
-        <a class="btn-signin" href="carrental_login.html">
+        <div class="success-desc">Your KDCR password has been updated successfully.<br>You can now sign in with your new credentials.</div>
+        <a class="btn-signin" href="/rent/login">
           <svg width="15" height="15" viewBox="0 0 15 15" fill="none" color="white" style="position:relative;z-index:1"><path d="M3 7.5h9M8.5 4l4 3.5-4 4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
           <span style="position:relative;z-index:1">Back to Sign In</span>
         </a>
@@ -330,9 +332,8 @@
 <!-- Toast -->
 <div class="toast" id="toast">
   <svg width="15" height="15" viewBox="0 0 15 15" fill="none" id="toastIcon">
-    <circle cx="7.5" cy="7.5" r="6" stroke="#E8341A" stroke-width="1.3"/>
-    <path d="M7.5 5v3" stroke="#E8341A" stroke-width="1.5" stroke-linecap="round"/>
-    <circle cx="7.5" cy="10" r="0.7" fill="#E8341A"/>
+    <circle cx="7.5" cy="5" r="2.2" stroke="#E8341A" stroke-width="1.3"/>
+    <path d="M4 12c0-1.7 1.8-3 3.5-3s3.5 1.3 3.5 3" stroke="#E8341A" stroke-width="1.3" stroke-linecap="round"/>
   </svg>
   <span id="toastMsg">Something went wrong.</span>
 </div>
